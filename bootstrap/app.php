@@ -15,6 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectUsersTo('/studio');
+
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         // Pixelforge can't send a CSRF token; its requests are verified by signature instead.

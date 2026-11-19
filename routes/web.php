@@ -6,7 +6,8 @@ use App\Http\Controllers\PixelforgeWebhookController;
 use App\Http\Controllers\StudioController;
 use Illuminate\Support\Facades\Route;
 
-Route::inertia('/', 'Welcome')->name('home');
+// Guests get the landing page; signed-in users go straight to the studio.
+Route::inertia('/', 'Welcome')->middleware('guest')->name('home');
 
 Route::middleware('auth')->group(function () {
     Route::redirect('dashboard', 'studio')->name('dashboard');
