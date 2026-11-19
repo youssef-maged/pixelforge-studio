@@ -17,8 +17,8 @@ class DatabaseSeeder extends Seeder
     public function run(BuyCredits $buy): void
     {
         $accounts = [
-            ['name' => 'Demo User', 'email' => 'demo@pixelforge.test', 'password' => env('DEMO_PASSWORD'), 'admin' => false],
-            ['name' => 'Reviewer', 'email' => 'reviewer@pixelforge.test', 'password' => env('ADMIN_PASSWORD'), 'admin' => true],
+            ['name' => 'Demo User', 'email' => 'demo@pixelforge.test', 'password' => config('app.seed_passwords.demo'), 'admin' => false],
+            ['name' => 'Reviewer', 'email' => 'reviewer@pixelforge.test', 'password' => config('app.seed_passwords.admin'), 'admin' => true],
         ];
 
         foreach ($accounts as $account) {

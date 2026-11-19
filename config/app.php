@@ -54,6 +54,12 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    // Port `php artisan serve` listens on locally; the dev tunnel points at it.
+    'dev_port' => (int) env('SERVER_PORT', 8000),
+
+    // Passwords for the seeded demo and reviewer accounts; random ones are generated when unset.
+    'seed_passwords' => ['demo' => env('DEMO_PASSWORD'), 'admin' => env('ADMIN_PASSWORD')],
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

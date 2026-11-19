@@ -41,7 +41,7 @@ class AppServiceProvider extends ServiceProvider
             // `composer run dev` also runs the scheduler (the missed-webhook safety net) and a public tunnel,
             // because Pixelforge only delivers webhooks to public URLs.
             DevCommands::artisan('schedule:work', 'scheduler');
-            DevCommands::register('cloudflared tunnel --no-autoupdate --url http://localhost:'.env('SERVER_PORT', 8000), 'tunnel');
+            DevCommands::register('cloudflared tunnel --no-autoupdate --url http://localhost:'.config('app.dev_port'), 'tunnel');
         }
     }
 
