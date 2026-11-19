@@ -1,56 +1,71 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
+import { ArrowRight } from '@lucide/vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
+import PrintWall from '@/components/marketing/PrintWall.vue';
 import { login, register } from '@/routes';
 
 defineProps<{ canRegister?: boolean }>();
 
-const promises = [
-    { label: 'Priced before you print', body: 'See the most a generation can cost before you click. You pay the real cost when it finishes, never more.' },
-    { label: 'Failures are free', body: 'If Pixelforge rejects or fails a generation, nothing is charged and your held credits come straight back.' },
-    { label: 'Charged exactly once', body: 'Every cent is recorded to the nanodollar and reconciled with Pixelforge, however many times its webhooks arrive.' },
+const PROMISES = [
+    ['Priced before you click', 'Pixelforge bills per token, and some tokens are only known afterwards. You see the most an image can cost up front, then pay what it really cost.'],
+    ['Failures are free', 'Rejected prompts, provider errors and generations that fail midway cost nothing. Held credits come straight back.'],
+    ['Charged exactly once', 'Webhooks arrive twice and out of order. Every charge is still recorded once, to the nanodollar, and reconciled with Pixelforge.'],
 ];
 </script>
 
 <template>
-    <Head title="Welcome" />
+    <Head title="Image generation with honest pricing" />
 
-    <div class="min-h-svh bg-background text-foreground">
-        <header class="mx-auto flex max-w-5xl items-center justify-between px-6 py-6">
-            <span class="flex items-center gap-2 font-medium">
-                <AppLogoIcon class="size-6 text-primary" />
+    <div class="min-h-dvh">
+        <header class="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+            <span class="flex items-center gap-2 text-sm font-semibold tracking-tight">
+                <AppLogoIcon class="size-5 text-primary" />
                 PixelForge Studio
             </span>
-            <nav class="flex items-center gap-2 text-sm">
-                <Link :href="login()" class="rounded-sm px-3 py-1.5 hover:bg-secondary">Log in</Link>
-                <Link :href="register()" class="rounded-sm bg-primary px-3 py-1.5 text-primary-foreground hover:bg-primary/90">
-                    Create an account
-                </Link>
+            <nav class="flex items-center gap-1 text-sm">
+                <Link :href="login()" class="rounded-lg px-3 py-1.5 text-muted-foreground transition-colors hover:text-foreground">Log in</Link>
+                <Link :href="register()" class="rounded-lg bg-primary px-3.5 py-1.5 font-medium text-primary-foreground transition-opacity hover:opacity-90">Sign up</Link>
             </nav>
         </header>
 
-        <main class="mx-auto grid max-w-5xl gap-14 px-6 pt-12 pb-24 md:pt-24">
-            <section class="max-w-2xl">
-                <h1 class="font-display text-5xl leading-[1.05] tracking-tight text-balance md:text-6xl">
-                    Write a prompt. <em class="text-primary">Watch it develop.</em>
-                </h1>
-                <p class="mt-6 max-w-xl text-lg text-pretty text-muted-foreground">
-                    An image studio on top of Pixelforge, with prices you can read like a receipt.
-                </p>
-                <Link
-                    :href="register()"
-                    class="mt-8 inline-flex rounded-sm bg-primary px-5 py-2.5 font-medium text-primary-foreground hover:bg-primary/90"
-                >
-                    Start printing
-                </Link>
+        <main class="mx-auto max-w-6xl px-6">
+            <section class="grid items-center gap-12 py-12 lg:grid-cols-[1fr_1.05fr] lg:py-20">
+                <div>
+                    <h1 class="text-4xl font-semibold tracking-tight text-balance md:text-6xl md:leading-[1.02]">
+                        Generate images, <span class="text-muted-foreground">know the price first</span>
+                    </h1>
+                    <p class="mt-6 max-w-lg text-lg text-pretty text-muted-foreground">
+                        Write a prompt, pick a size and quality, and watch it generate live, with the cost on every image down to the fraction of a cent.
+                    </p>
+                    <div class="mt-8 flex flex-wrap items-center gap-3">
+                        <Link :href="register()" class="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 font-medium text-primary-foreground transition-opacity hover:opacity-90">
+                            Start generating <ArrowRight class="size-4" />
+                        </Link>
+                        <Link :href="login()" class="rounded-xl px-4 py-3 text-sm text-muted-foreground transition-colors hover:text-foreground">I have an account</Link>
+                    </div>
+                </div>
+
+                <div class="relative aspect-[5/4] overflow-hidden rounded-3xl border bg-black shadow-[0_40px_120px_-40px_rgb(0_0_0/0.6)]">
+                    <PrintWall />
+                    <div class="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent" />
+                    <div class="receipt absolute right-4 bottom-4 left-4 flex items-center justify-between rounded-xl border border-white/10 bg-black/60 px-4 py-3 text-xs text-white backdrop-blur-md">
+                        <span class="text-white/70">A lighthouse on a cliff at dawn, oil painting</span>
+                        <span>up to $0.0864 · charged $0.0807</span>
+                    </div>
+                </div>
             </section>
 
-            <ul class="grid gap-px overflow-hidden rounded-sm border bg-border md:grid-cols-3">
-                <li v-for="promise in promises" :key="promise.label" class="bg-card p-6">
-                    <h2 class="font-display text-lg">{{ promise.label }}</h2>
-                    <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{{ promise.body }}</p>
-                </li>
-            </ul>
+            <section class="grid gap-x-10 gap-y-8 border-t py-14 md:grid-cols-3">
+                <div v-for="[label, body] in PROMISES" :key="label">
+                    <h2 class="font-medium">{{ label }}</h2>
+                    <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{{ body }}</p>
+                </div>
+            </section>
         </main>
+
+        <footer class="mx-auto max-w-6xl px-6 py-8 text-xs text-muted-foreground">
+            Built on the Pixelforge API. Credits are fake US dollars; no payment is ever taken.
+        </footer>
     </div>
 </template>

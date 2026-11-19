@@ -23,10 +23,14 @@ class GenerationResource extends JsonResource
             'reference_images' => $this->reference_images,
             'estimate' => Nano::toDecimal($this->estimate_nano),
             'charge' => $this->charge_nano === null ? null : Nano::toDecimal($this->charge_nano),
+            'provider_cost' => $this->provider_cost_nano === null ? null : Nano::toDecimal($this->provider_cost_nano),
+            'usage' => $this->usage,
+            'rates' => $this->rates,
             'image' => $this->imageSrc(),
             'error_code' => $this->error_code,
             'failure_reason' => $this->failureReason(),
             'created_at' => $this->created_at->toIso8601ZuluString(),
+            'started_at' => $this->started_at?->toIso8601ZuluString(),
             'completed_at' => $this->completed_at?->toIso8601ZuluString(),
         ];
     }

@@ -10,6 +10,10 @@ export type Generation = {
     reference_images: string[];
     estimate: string;
     charge: string | null;
+    provider_cost: string | null;
+    usage: Record<string, number> | null;
+    rates: Record<string, string> | null;
+    started_at: string | null;
     image: string | null;
     error_code: string | null;
     failure_reason: string | null;

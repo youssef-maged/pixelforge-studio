@@ -14,7 +14,6 @@ export default defineConfig({
             fonts: [
                 bunny('Geist', { weights: [400, 500, 600] }),
                 bunny('Geist Mono', { weights: [400, 500] }),
-                bunny('Fraunces', { weights: [400, 600], styles: ['normal', 'italic'] }),
             ],
         }),
         inertia(),
