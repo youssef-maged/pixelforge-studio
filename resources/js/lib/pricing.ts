@@ -12,13 +12,21 @@ export function maxUserPriceNano(
     referenceImages: number,
 ): bigint {
     const tokens = list.tokens;
-    const characters = [...prompt.trim()].length; // Unicode code points, like PHP's mb_strlen
-    const estimatedText = Math.ceil(characters / tokens.characters_per_text_token);
-    const varianceBasisPoints = BigInt(Math.round(tokens.text_token_variance * 10_000));
+    const characters = Array.from(prompt.trim()).length; // Unicode code points, like PHP's mb_strlen
+    const estimatedText = Math.ceil(
+        characters / tokens.characters_per_text_token,
+    );
+    const varianceBasisPoints = BigInt(
+        Math.round(tokens.text_token_variance * 10_000),
+    );
 
     const maxUsage: Record<string, bigint> = {
-        input_text_tokens: (BigInt(estimatedText) * (10_000n + varianceBasisPoints) + 9_999n) / 10_000n,
-        input_image_tokens: BigInt(referenceImages * tokens.per_reference_image),
+        input_text_tokens:
+            (BigInt(estimatedText) * (10_000n + varianceBasisPoints) + 9_999n) /
+            10_000n,
+        input_image_tokens: BigInt(
+            referenceImages * tokens.per_reference_image,
+        ),
         output_tokens: BigInt(tokens.output[quality]?.[size] ?? 0),
         reasoning_tokens: BigInt(tokens.reasoning[quality]?.max ?? 0),
     };

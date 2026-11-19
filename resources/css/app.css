@@ -174,17 +174,33 @@
     /* A print developing in the tray: the image surfaces slowly while in flight. */
     .developing {
         background:
-            linear-gradient(110deg, transparent 30%, color-mix(in oklch, var(--primary) 18%, transparent) 50%, transparent 70%) 0 0 / 250% 100%,
+            linear-gradient(
+                    110deg,
+                    transparent 30%,
+                    color-mix(in oklch, var(--primary) 18%, transparent) 50%,
+                    transparent 70%
+                )
+                0 0 / 250% 100%,
             var(--raised);
         animation: develop 2.4s ease-in-out infinite;
     }
 
     @keyframes develop {
-        from { background-position: 100% 0, 0 0; }
-        to { background-position: -150% 0, 0 0; }
+        from {
+            background-position:
+                100% 0,
+                0 0;
+        }
+        to {
+            background-position:
+                -150% 0,
+                0 0;
+        }
     }
 
     @media (prefers-reduced-motion: reduce) {
-        .developing { animation: none; }
+        .developing {
+            animation: none;
+        }
     }
 }

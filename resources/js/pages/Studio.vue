@@ -1,12 +1,20 @@
 <script setup lang="ts">
-import { Head, InfiniteScroll, Link, useForm, usePage, usePoll } from '@inertiajs/vue3';
-import { FlaskConical, ImagePlus, X } from '@lucide/vue';
+import {
+    Head,
+    InfiniteScroll,
+    Link,
+    useForm,
+    usePage,
+    usePoll,
+} from '@inertiajs/vue3';
+import { FlaskConical, ImagePlus } from '@lucide/vue';
 import { useOnline } from '@vueuse/core';
 import { computed, reactive, ref, watch } from 'vue';
 import { toast } from 'vue-sonner';
 import InputError from '@/components/InputError.vue';
 import GenerationDialog from '@/components/studio/GenerationDialog.vue';
 import GenerationTile from '@/components/studio/GenerationTile.vue';
+import ReferenceImages from '@/components/studio/ReferenceImages.vue';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -15,8 +23,12 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Spinner } from '@/components/ui/spinner';
 import { exact, toNano, usd } from '@/lib/money';
 import { maxUserPriceNano } from '@/lib/pricing';
@@ -24,7 +36,9 @@ import { credits as creditsPage, studio } from '@/routes';
 import { store } from '@/routes/generations';
 import type { Credits, Generation, PricingList } from '@/types';
 
-defineOptions({ layout: { breadcrumbs: [{ title: 'Studio', href: studio() }] } });
+defineOptions({
+    layout: { breadcrumbs: [{ title: 'Studio', href: studio() }] },
+});
 
 const props = defineProps<{
     generations: { data: Generation[] };
@@ -36,8 +50,20 @@ const page = usePage<{ credits: Credits }>();
 
 const SIZES = [
     { key: '1024x1024', label: '1:1', name: 'Square, 1024×1024', w: 12, h: 12 },
-    { key: '1536x1024', label: '3:2', name: 'Landscape, 1536×1024', w: 15, h: 10 },
-    { key: '1024x1536', label: '2:3', name: 'Portrait, 1024×1536', w: 10, h: 15 },
+    {
+        key: '1536x1024',
+        label: '3:2',
+        name: 'Landscape, 1536×1024',
+        w: 15,
+        h: 10,
+    },
+    {
+        key: '1024x1536',
+        label: '2:3',
+        name: 'Portrait, 1024×1536',
+        w: 10,
+        h: 15,
+    },
 ];
 const QUALITIES = ['low', 'medium', 'high'];
 const TEST_KEYWORDS = [
@@ -64,39 +90,48 @@ const composer = useForm({
 
 // --- Price, before anything is submitted -----------------------------------------------------
 const estimate = computed(() =>
-    maxUserPriceNano(props.pricing, composer.prompt, composer.size, composer.quality, composer.reference_images.length),
+    maxUserPriceNano(
+        props.pricing,
+        composer.prompt,
+        composer.size,
+        composer.quality,
+        composer.reference_images.length,
+    ),
 );
 const availableDecimal = computed(() => page.props.credits.available);
 const available = computed(() => toNano(availableDecimal.value));
 // Server-side errors the form has no field for (balance) and per-list errors.
-const errors = computed(() => composer.errors as Record<string, string | undefined>);
+const errors = computed(
+    () => composer.errors as Record<string, string | undefined>,
+);
 const shortBy = computed(() => estimate.value - available.value);
 const canAfford = computed(() => shortBy.value <= 0n);
 const busy = computed(() => composer.processing);
 const selectedSize = computed(() => composer.size);
 const selectedQuality = computed(() => composer.quality);
-const canSubmit = computed(() => !busy.value && canAfford.value && composer.prompt.trim() !== '');
-const promptLength = computed(() => [...composer.prompt].length);
+const canSubmit = computed(
+    () => !busy.value && canAfford.value && composer.prompt.trim() !== '',
+);
+const promptLength = computed(() => Array.from(composer.prompt).length);
 
-// --- Reference images ---------------------------------------------------------------------------
-const referenceDraft = ref('');
-const referenceError = ref('');
-const unpreviewable = reactive(new Set<string>());
-
-function addReference(): void {
-    const url = referenceDraft.value.trim();
-    referenceError.value = '';
-    if (!/^https?:\/\/\S+$/i.test(url)) {
-        referenceError.value = 'Use an http(s) link to an image.';
-        return;
-    }
-    if (composer.reference_images.includes(url)) {
-        referenceError.value = 'Already added. Pixelforge would bill it twice.';
-        return;
-    }
-    composer.reference_images.push(url);
-    referenceDraft.value = '';
-}
+// --- Reference images: each is billed as a fixed number of input image tokens -------------------
+const referenceCost = computed(
+    () =>
+        maxUserPriceNano(
+            props.pricing,
+            composer.prompt,
+            composer.size,
+            composer.quality,
+            1,
+        ) -
+        maxUserPriceNano(
+            props.pricing,
+            composer.prompt,
+            composer.size,
+            composer.quality,
+            0,
+        ),
+);
 
 function setSize(size: string): void {
     composer.size = size;
@@ -124,7 +159,9 @@ function submit(): void {
         preserveScroll: true,
         reset: ['generations'],
         onSuccess: () => {
-            toast.success('Sent to Pixelforge', { description: `Up to ${usd(estimate.value, { round: 'up' })} is held until it finishes.` });
+            toast.success('Sent to Pixelforge', {
+                description: `Up to ${usd(estimate.value, { round: 'up' })} is held until it finishes.`,
+            });
             composer.reset('prompt', 'reference_images');
             composer.client_request_id = crypto.randomUUID();
         },
@@ -150,44 +187,72 @@ watch(
     () => props.watched,
     (watched) =>
         watched?.data.forEach((g) => {
-            const before = latest.get(g.id) ?? props.generations.data.find((p) => p.id === g.id);
+            const before =
+                latest.get(g.id) ??
+                props.generations.data.find((p) => p.id === g.id);
             if (before?.in_flight && !g.in_flight) {
                 if (g.status === 'succeeded') {
-                    toast.success('Image ready', { description: `Charged ${usd(g.charge ?? '0')} (estimate was up to ${usd(g.estimate, { round: 'up' })}).` });
+                    toast.success('Image ready', {
+                        description: `Charged ${usd(g.charge ?? '0')} (estimate was up to ${usd(g.estimate, { round: 'up' })}).`,
+                    });
                 } else {
-                    toast.error('Generation failed · not charged', { description: g.failure_reason ?? undefined });
+                    toast.error('Generation failed · not charged', {
+                        description: g.failure_reason ?? undefined,
+                    });
                 }
             }
             latest.set(g.id, g);
         }),
 );
-const prints = computed(() => props.generations.data.map((g) => latest.get(g.id) ?? g));
+const prints = computed(() =>
+    props.generations.data.map((g) => latest.get(g.id) ?? g),
+);
 // Keep an open dialog in step with live updates.
 watch(prints, (list) => {
     if (selected.value) {
-        selected.value = list.find((g) => g.id === selected.value?.id) ?? selected.value;
+        selected.value =
+            list.find((g) => g.id === selected.value?.id) ?? selected.value;
     }
 });
-const inFlightIds = computed(() => prints.value.filter((g) => g.in_flight).map((g) => g.id));
+const inFlightIds = computed(() =>
+    prints.value.filter((g) => g.in_flight).map((g) => g.id),
+);
 
 const poll = usePoll(
     2000,
-    () => ({ only: ['watched', 'credits'], data: { watch: inFlightIds.value }, preserveUrl: true }),
+    () => ({
+        only: ['watched', 'credits'],
+        data: { watch: inFlightIds.value },
+        preserveUrl: true,
+    }),
     { autoStart: false, mode: 'rest' },
 );
 // Poll only while something is in flight and we're online; resume as soon as the connection is back.
 const online = useOnline();
-watch([inFlightIds, online], ([ids, isOnline]) => (ids.length && isOnline ? poll.start() : poll.stop()), { immediate: true });
+watch(
+    [inFlightIds, online],
+    ([ids, isOnline]) => (ids.length && isOnline ? poll.start() : poll.stop()),
+    { immediate: true },
+);
 </script>
 
 <template>
     <Head title="Studio" />
 
-    <div class="mx-auto flex w-full max-w-6xl flex-col gap-12 px-4 pt-10 pb-20 md:px-6 md:pt-14">
+    <div
+        class="mx-auto flex w-full max-w-6xl flex-col gap-12 px-4 pt-10 pb-20 md:px-6 md:pt-14"
+    >
         <section class="mx-auto flex w-full max-w-3xl flex-col gap-5">
             <div class="text-center">
-                <h1 class="text-2xl font-semibold tracking-tight text-balance md:text-3xl">What will you create?</h1>
-                <p class="mt-1.5 text-sm text-muted-foreground">Priced before you click. Charged only what it really costs. Failures are free.</p>
+                <h1
+                    class="text-2xl font-semibold tracking-tight text-balance md:text-3xl"
+                >
+                    What will you create?
+                </h1>
+                <p class="mt-1.5 text-sm text-muted-foreground">
+                    Priced before you click. Charged only what it really costs.
+                    Failures are free.
+                </p>
             </div>
 
             <form
@@ -208,70 +273,71 @@ watch([inFlightIds, online], ([ids, isOnline]) => (ids.length && isOnline ? poll
                     @keydown.ctrl.enter.prevent="submit"
                 />
 
-                <div v-if="composer.reference_images.length || showReferences" class="flex flex-wrap items-center gap-2 px-2 pb-2">
-                    <div
-                        v-for="(url, index) in composer.reference_images"
-                        :key="url"
-                        class="relative size-14 overflow-hidden rounded-lg border bg-raised"
-                        :title="url"
-                    >
-                        <img
-                            v-if="!unpreviewable.has(url)"
-                            :src="url"
-                            alt=""
-                            class="size-full object-cover"
-                            referrerpolicy="no-referrer"
-                            @error="unpreviewable.add(url)"
-                        />
-                        <span v-else class="grid size-full place-items-center p-1 text-center text-[10px] leading-tight text-muted-foreground">No preview</span>
-                        <button
-                            type="button"
-                            class="absolute top-0.5 right-0.5 grid size-5 place-items-center rounded-full bg-background/90 shadow-sm"
-                            :aria-label="`Remove reference image ${index + 1}`"
-                            @click="composer.reference_images.splice(index, 1)"
-                        >
-                            <X class="size-3" />
-                        </button>
-                    </div>
-                    <div v-if="composer.reference_images.length < 4" class="flex min-w-64 flex-1 gap-2">
-                        <Input
-                            v-model="referenceDraft"
-                            type="url"
-                            inputmode="url"
-                            placeholder="Paste an image URL to guide the style"
-                            aria-label="Reference image URL"
-                            class="h-9 rounded-lg"
-                            @keydown.enter.prevent="addReference"
-                        />
-                        <Button type="button" variant="secondary" size="sm" class="h-9" @click="addReference">Add</Button>
-                    </div>
-                </div>
+                <ReferenceImages
+                    v-if="composer.reference_images.length || showReferences"
+                    v-model="composer.reference_images"
+                    :cost-each="referenceCost"
+                    :errors="errors"
+                />
 
                 <div class="flex flex-wrap items-center gap-1.5 px-1 pt-1">
                     <TooltipProvider :delay-duration="300">
-                        <div class="flex rounded-lg bg-raised p-0.5" role="radiogroup" aria-label="Size">
+                        <div
+                            class="flex rounded-lg bg-raised p-0.5"
+                            role="radiogroup"
+                            aria-label="Size"
+                        >
                             <Tooltip v-for="shape in SIZES" :key="shape.key">
                                 <TooltipTrigger as-child>
                                     <label
                                         class="flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs text-muted-foreground transition-colors has-checked:bg-background has-checked:text-foreground has-checked:shadow-sm has-focus-visible:ring-2 has-focus-visible:ring-ring"
                                     >
-                                        <input type="radio" name="size" :value="shape.key" :checked="selectedSize === shape.key" class="sr-only" :aria-label="shape.name" @change="setSize(shape.key)" />
-                                        <span class="rounded-[2px] border-[1.5px] border-current" :style="{ width: shape.w + 'px', height: shape.h + 'px' }" />
+                                        <input
+                                            type="radio"
+                                            name="size"
+                                            :value="shape.key"
+                                            :checked="
+                                                selectedSize === shape.key
+                                            "
+                                            class="sr-only"
+                                            :aria-label="shape.name"
+                                            @change="setSize(shape.key)"
+                                        />
+                                        <span
+                                            class="rounded-[2px] border-[1.5px] border-current"
+                                            :style="{
+                                                width: shape.w + 'px',
+                                                height: shape.h + 'px',
+                                            }"
+                                        />
                                         {{ shape.label }}
                                     </label>
                                 </TooltipTrigger>
-                                <TooltipContent>{{ shape.name }}</TooltipContent>
+                                <TooltipContent>{{
+                                    shape.name
+                                }}</TooltipContent>
                             </Tooltip>
                         </div>
                     </TooltipProvider>
 
-                    <div class="flex rounded-lg bg-raised p-0.5" role="radiogroup" aria-label="Quality">
+                    <div
+                        class="flex rounded-lg bg-raised p-0.5"
+                        role="radiogroup"
+                        aria-label="Quality"
+                    >
                         <label
                             v-for="level in QUALITIES"
                             :key="level"
                             class="cursor-pointer rounded-md px-2.5 py-1.5 text-xs text-muted-foreground capitalize transition-colors has-checked:bg-background has-checked:text-foreground has-checked:shadow-sm has-focus-visible:ring-2 has-focus-visible:ring-ring"
                         >
-                            <input type="radio" name="quality" :value="level" :checked="selectedQuality === level" class="sr-only" @change="setQuality(level)" />
+                            <input
+                                type="radio"
+                                name="quality"
+                                :value="level"
+                                :checked="selectedQuality === level"
+                                class="sr-only"
+                                @change="setQuality(level)"
+                            />
                             {{ level }}
                         </label>
                     </div>
@@ -284,75 +350,158 @@ watch([inFlightIds, online], ([ids, isOnline]) => (ids.length && isOnline ? poll
                         :aria-pressed="showReferences"
                         @click="showReferences = !showReferences"
                     >
-                        <ImagePlus /> References<span v-if="composer.reference_images.length" class="receipt">· {{ composer.reference_images.length }}</span>
+                        <ImagePlus /> References<span
+                            v-if="composer.reference_images.length"
+                            class="receipt"
+                            >· {{ composer.reference_images.length }}</span
+                        >
                     </Button>
 
                     <DropdownMenu>
                         <DropdownMenuTrigger as-child>
-                            <Button type="button" variant="ghost" size="sm" class="h-8 text-xs text-muted-foreground"><FlaskConical /> Test</Button>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                class="h-8 text-xs text-muted-foreground"
+                                ><FlaskConical /> Test</Button
+                            >
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start" class="w-64">
-                            <DropdownMenuLabel class="text-xs font-normal text-muted-foreground">Pixelforge test keywords, added to the prompt</DropdownMenuLabel>
-                            <DropdownMenuItem v-for="item in TEST_KEYWORDS" :key="item.keyword" @select="appendKeyword(item.keyword)">
-                                <span class="receipt text-xs">{{ item.keyword }}</span>
-                                <span class="ml-auto text-xs text-muted-foreground">{{ item.effect }}</span>
+                            <DropdownMenuLabel
+                                class="text-xs font-normal text-muted-foreground"
+                                >Pixelforge test keywords, added to the
+                                prompt</DropdownMenuLabel
+                            >
+                            <DropdownMenuItem
+                                v-for="item in TEST_KEYWORDS"
+                                :key="item.keyword"
+                                @select="appendKeyword(item.keyword)"
+                            >
+                                <span class="receipt text-xs">{{
+                                    item.keyword
+                                }}</span>
+                                <span
+                                    class="ml-auto text-xs text-muted-foreground"
+                                    >{{ item.effect }}</span
+                                >
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
 
                     <div class="ml-auto flex items-center gap-3">
-                        <div class="text-right leading-tight" aria-live="polite">
-                            <div class="receipt text-sm font-medium" :title="exact(usd(estimate, { places: 9 }).slice(1))">
-                                <span class="text-xs font-normal text-muted-foreground">up to </span>{{ usd(estimate, { round: 'up' }) }}
+                        <div
+                            class="text-right leading-tight"
+                            aria-live="polite"
+                        >
+                            <div
+                                class="receipt text-sm font-medium"
+                                :title="
+                                    exact(usd(estimate, { places: 9 }).slice(1))
+                                "
+                            >
+                                <span
+                                    class="text-xs font-normal text-muted-foreground"
+                                    >up to </span
+                                >{{ usd(estimate, { round: 'up' }) }}
                             </div>
-                            <div class="receipt text-[11px] text-muted-foreground" :title="exact(availableDecimal)">{{ usd(availableDecimal) }} available</div>
+                            <div
+                                class="receipt text-[11px] text-muted-foreground"
+                                :title="exact(availableDecimal)"
+                            >
+                                {{ usd(availableDecimal) }} available
+                            </div>
                         </div>
-                        <Button type="submit" class="h-9 rounded-lg px-4" :disabled="!canSubmit">
+                        <Button
+                            type="submit"
+                            class="h-9 rounded-lg px-4"
+                            :disabled="!canSubmit"
+                        >
                             <Spinner v-if="busy" />
                             Generate
-                            <kbd class="receipt hidden rounded border border-current/25 px-1 text-[10px] leading-4 opacity-75 sm:inline">⌘↵</kbd>
+                            <kbd
+                                class="receipt hidden rounded border border-current/25 px-1 text-[10px] leading-4 opacity-75 sm:inline"
+                                >⌘↵</kbd
+                            >
                         </Button>
                     </div>
                 </div>
             </form>
 
-            <div v-if="!canAfford || errors.credits" class="flex items-center justify-between gap-4 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm">
-                <span>{{ errors.credits ?? `You need ${usd(shortBy, { round: 'up' })} more credit for this one.` }}</span>
-                <Link :href="creditsPage()" class="shrink-0 font-medium text-primary hover:underline">Buy credits</Link>
+            <div
+                v-if="!canAfford || errors.credits"
+                class="flex items-center justify-between gap-4 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3 text-sm"
+            >
+                <span>{{
+                    errors.credits ??
+                    `You need ${usd(shortBy, { round: 'up' })} more credit for this one.`
+                }}</span>
+                <Link
+                    :href="creditsPage()"
+                    class="shrink-0 font-medium text-primary hover:underline"
+                    >Buy credits</Link
+                >
             </div>
-            <InputError :message="errors.prompt ?? referenceError ?? errors.reference_images" class="px-1" />
-            <InputError v-for="(url, index) in composer.reference_images" :key="url" :message="errors[`reference_images.${index}`]" class="px-1" />
+            <InputError :message="errors.prompt" class="px-1" />
         </section>
 
         <section aria-labelledby="results-title" class="flex flex-col gap-4">
             <div class="flex items-baseline justify-between">
-                <h2 id="results-title" class="text-sm font-medium">Your generations</h2>
-                <span v-if="inFlightIds.length" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span class="size-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
+                <h2 id="results-title" class="text-sm font-medium">
+                    Your generations
+                </h2>
+                <span
+                    v-if="inFlightIds.length"
+                    class="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+                >
+                    <span
+                        class="size-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
+                    />
                     {{ inFlightIds.length }} in progress
                 </span>
             </div>
 
-            <div v-if="!prints.length" class="flex flex-col items-center gap-4 rounded-2xl border border-dashed px-6 py-16 text-center">
-                <p class="text-sm text-muted-foreground">Nothing here yet. Try one of these:</p>
+            <div
+                v-if="!prints.length"
+                class="flex flex-col items-center gap-4 rounded-2xl border border-dashed px-6 py-16 text-center"
+            >
+                <p class="text-sm text-muted-foreground">
+                    Nothing here yet. Try one of these:
+                </p>
                 <div class="flex flex-wrap justify-center gap-2">
                     <button
                         v-for="example in EXAMPLES"
                         :key="example"
                         type="button"
                         class="rounded-full border bg-card px-3.5 py-1.5 text-sm transition-colors hover:border-primary/50"
-                        @click="composer.prompt = example; promptField?.focus()"
+                        @click="
+                            composer.prompt = example;
+                            promptField?.focus();
+                        "
                     >
                         {{ example }}
                     </button>
                 </div>
             </div>
 
-            <InfiniteScroll data="generations" class="grid grid-cols-1 gap-3 min-[460px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-                <GenerationTile v-for="generation in prints" :key="generation.id" :generation="generation" @open="selected = $event" @retry="retry" />
+            <InfiniteScroll
+                data="generations"
+                class="grid grid-cols-1 gap-3 min-[460px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4"
+            >
+                <GenerationTile
+                    v-for="generation in prints"
+                    :key="generation.id"
+                    :generation="generation"
+                    @open="selected = $event"
+                    @retry="retry"
+                />
             </InfiniteScroll>
         </section>
 
-        <GenerationDialog :generation="selected" @close="selected = null" @retry="retry" />
+        <GenerationDialog
+            :generation="selected"
+            @close="selected = null"
+            @retry="retry"
+        />
     </div>
 </template>

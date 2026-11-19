@@ -33,13 +33,16 @@ class AppServiceProvider extends ServiceProvider
 
         // Our own limits, so one user or script can't burn the shared Pixelforge allowance.
         RateLimiter::for('generations', fn (Request $request) => Limit::perMinute(10)->by($request->user()?->id ?: $request->ip()));
+        RateLimiter::for('uploads', fn (Request $request) => Limit::perMinute(20)->by($request->user()?->id ?: $request->ip()));
         RateLimiter::for('purchases', fn (Request $request) => Limit::perMinute(5)->by($request->user()?->id ?: $request->ip()));
 
         Gate::define('view-admin-report', fn (User $user) => $user->is_admin);
 
         if ($this->app->isLocal()) {
-            // `composer run dev` also runs the scheduler (the missed-webhook safety net) and a public tunnel,
+            // `composer run dev` runs Horizon instead of a plain listener, plus the scheduler (the missed-webhook safety net) and a public tunnel,
             // because Pixelforge only delivers webhooks to public URLs.
+            DevCommands::except('queue');
+            DevCommands::artisan('horizon', 'horizon');
             DevCommands::artisan('schedule:work', 'scheduler');
             DevCommands::register('cloudflared tunnel --no-autoupdate --url http://localhost:'.config('app.dev_port'), 'tunnel');
         }

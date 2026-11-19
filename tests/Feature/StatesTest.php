@@ -21,7 +21,7 @@ it('never sends secrets to the browser, on any page, for users or admins', funct
     $admin = User::factory()->create();
     $admin->forceFill(['is_admin' => true])->save();
 
-    foreach ([[$user, ['/studio', '/credits', '/settings/profile']], [$admin, ['/studio', '/credits', '/admin/report']]] as [$who, $pages]) {
+    foreach ([[$user, ['/studio', '/credits', '/settings/profile']], [$admin, ['/studio', '/credits', '/admin/report', '/admin/generations', '/admin/users', '/admin/webhooks']]] as [$who, $pages]) {
         foreach ($pages as $url) {
             $html = $this->actingAs($who)->get($url)->assertOk()->getContent();
 
@@ -55,4 +55,25 @@ it('explains an expired session instead of showing "419 Page Expired"', function
     Route::middleware('web')->post('/_expired', fn () => throw new TokenMismatchException);
 
     $this->post('/_expired')->assertRedirect('/login');
+});
+
+it('keeps every operator page and Horizon for admins', function () {
+    $user = User::factory()->create();
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
+
+    foreach (['/admin/report', '/admin/generations', '/admin/users', '/admin/webhooks'] as $url) {
+        $this->actingAs($user)->get($url)->assertForbidden();
+        $this->actingAs($admin)->get($url)->assertOk();
+    }
+    $this->actingAs($user)->get('/horizon')->assertForbidden();
+});
+
+it('filters the operator lists and validates their filters', function () {
+    $admin = User::factory()->create();
+    $admin->forceFill(['is_admin' => true])->save();
+
+    $this->actingAs($admin)->get('/admin/generations?status=nonsense')->assertSessionHasErrors('status');
+    $this->actingAs($admin)->get('/admin/users?q=nobody-here')
+        ->assertInertia(fn ($page) => $page->component('Admin/Users')->where('users.data', []));
 });

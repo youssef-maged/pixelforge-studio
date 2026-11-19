@@ -143,3 +143,14 @@ it('answers pings and ignores events for generations it does not know', function
 
     expect(CreditTransaction::count())->toBe(0);
 });
+
+it('logs what each event did and counts duplicate deliveries', function () {
+    $object = providerObject($this->generation, 'succeeded');
+
+    sendWebhook($this, $object, 'generation.succeeded', eventId: 'evt_twice');
+    sendWebhook($this, $object, 'generation.succeeded', eventId: 'evt_twice');
+    sendWebhook($this, providerObject($this->generation, 'processing'), 'generation.processing', eventId: 'evt_late');
+
+    expect(WebhookEvent::find('evt_twice'))->deliveries->toBe(2)->outcome->toBe('moved queued → succeeded')
+        ->and(WebhookEvent::find('evt_late')->outcome)->toBe('no change (already succeeded)');
+});

@@ -2,13 +2,13 @@
 
 use App\Actions\RecordGenerationState;
 use App\Enums\GenerationStatus;
+use App\Jobs\ReconcileGenerations;
 use App\Jobs\SubmitGeneration;
 use App\Models\Generation;
 use App\Models\User;
 use App\Pixelforge\PixelforgeClient;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -162,12 +162,13 @@ it('fails for free when Pixelforge refuses outright', function (int $status, str
     'validation' => [422, 'validation_failed'],
 ]);
 
-it('really queues the submission on the database queue, in the same transaction', function () {
-    config(['queue.default' => 'database']);
-    $user = User::factory()->create(['balance_nano' => 10_000_000_000]);
+it('re-sends a generation whose job never reached the queue (the Redis commit gap)', function () {
+    Queue::fake();
+    $stuck = Generation::factory()->create(['updated_at' => now()->subMinutes(3)]);
+    $fresh = Generation::factory()->create();
 
-    $this->actingAs($user)->post('/generations', submitForm())->assertRedirect('/studio');
+    app()->call([new ReconcileGenerations, 'handle']);
 
-    $job = DB::table('jobs')->sole();
-    expect(json_decode($job->payload, true)['displayName'])->toBe(SubmitGeneration::class);
+    Queue::assertPushed(SubmitGeneration::class, fn (SubmitGeneration $job) => $job->generation->is($stuck));
+    Queue::assertNotPushed(SubmitGeneration::class, fn (SubmitGeneration $job) => $job->generation->is($fresh));
 });

@@ -46,9 +46,26 @@ class PixelforgeWebhookController extends Controller
                 'received_at' => now(),
             ]) === 1;
 
-            if ($isNew && $generation) {
-                $record->apply($generation, $object);
+            if (! $isNew) {
+                // A duplicate delivery: counted for the operator log, never applied twice.
+                WebhookEvent::query()->whereKey($event['id'])->update([
+                    'deliveries' => DB::raw('deliveries + 1'),
+                    'last_received_at' => now(),
+                ]);
+
+                return;
             }
+
+            $outcome = 'no matching generation';
+            if ($generation) {
+                $before = $generation->status;
+                $after = $record->apply($generation, $object);
+                $outcome = $after->wasChanged('status')
+                    ? "moved {$before->value} → {$after->status->value}"
+                    : "no change (already {$after->status->value})";
+            }
+
+            WebhookEvent::query()->whereKey($event['id'])->update(['outcome' => $outcome]);
         });
 
         return response()->noContent();

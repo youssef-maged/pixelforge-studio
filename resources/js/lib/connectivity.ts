@@ -6,7 +6,9 @@ export function initializeConnectivity(): void {
     router.on('networkError', () => {
         toast.error("Couldn't reach the server", {
             id: 'network-error',
-            description: navigator.onLine ? 'Check your connection and try again.' : "You're offline. Try again when you're back online.",
+            description: navigator.onLine
+                ? 'Check your connection and try again.'
+                : "You're offline. Try again when you're back online.",
         });
     });
 }

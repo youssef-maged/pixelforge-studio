@@ -35,8 +35,13 @@ const links = computed(() => [
     <header
         class="sticky top-0 z-30 border-b bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/65"
     >
-        <div class="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 md:gap-6 md:px-6">
-            <Link :href="studio()" class="flex shrink-0 items-center gap-2 text-sm font-semibold tracking-tight">
+        <div
+            class="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 md:gap-6 md:px-6"
+        >
+            <Link
+                :href="studio()"
+                class="flex shrink-0 items-center gap-2 text-sm font-semibold tracking-tight"
+            >
                 <AppLogoIcon class="size-5 text-primary" />
                 <span class="hidden sm:inline">PixelForge Studio</span>
             </Link>
@@ -47,7 +52,11 @@ const links = computed(() => [
                     :key="link.title"
                     :href="link.href"
                     class="rounded-lg px-2.5 py-1.5 transition-colors"
-                    :class="isCurrentUrl(link.href) ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'"
+                    :class="
+                        isCurrentUrl(link.href)
+                            ? 'bg-secondary text-foreground'
+                            : 'text-muted-foreground hover:text-foreground'
+                    "
                     :aria-current="isCurrentUrl(link.href) ? 'page' : undefined"
                 >
                     {{ link.title }}
@@ -61,7 +70,14 @@ const links = computed(() => [
                     class="receipt hidden items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs transition-colors hover:border-primary/50 sm:flex"
                     :title="exact(wallet.available)"
                 >
-                    <span :class="wallet.available.startsWith('-') ? 'text-destructive' : 'text-primary'">{{ usd(wallet.available) }}</span>
+                    <span
+                        :class="
+                            wallet.available.startsWith('-')
+                                ? 'text-destructive'
+                                : 'text-primary'
+                        "
+                        >{{ usd(wallet.available) }}</span
+                    >
                     <span class="text-muted-foreground">available</span>
                 </Link>
 
@@ -71,7 +87,9 @@ const links = computed(() => [
                         aria-label="Account menu"
                     >
                         <Avatar class="size-7">
-                            <AvatarFallback class="bg-accent text-[11px] font-medium text-accent-foreground">
+                            <AvatarFallback
+                                class="bg-accent text-[11px] font-medium text-accent-foreground"
+                            >
                                 {{ getInitials(user.name) }}
                             </AvatarFallback>
                         </Avatar>

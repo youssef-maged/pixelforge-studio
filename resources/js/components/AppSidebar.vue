@@ -1,8 +1,14 @@
 <script setup lang="ts">
-import { Link, usePage } from '@inertiajs/vue3';
-import { Aperture, ChartColumn, Coins, FileText } from '@lucide/vue';
-import { computed } from 'vue';
-import AppLogo from '@/components/AppLogo.vue';
+import { Link } from '@inertiajs/vue3';
+import {
+    ArrowLeft,
+    ChartColumn,
+    Gauge,
+    Images,
+    Users,
+    Webhook,
+} from '@lucide/vue';
+import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
@@ -15,26 +21,21 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
-import { credits, studio } from '@/routes';
-import { report } from '@/routes/admin';
+import { studio } from '@/routes';
+import { generations, report, users, webhooks } from '@/routes/admin';
 import type { NavItem } from '@/types';
 
-const page = usePage();
-
-const mainNavItems = computed<NavItem[]>(() => [
-    { title: 'Studio', href: studio(), icon: Aperture },
-    { title: 'Credits', href: credits(), icon: Coins },
-    ...(page.props.auth.user.is_admin
-        ? [{ title: 'Admin report', href: report(), icon: ChartColumn }]
-        : []),
-]);
+// The operator console. Customers never see this sidebar; the Studio uses the top bar.
+const mainNavItems: NavItem[] = [
+    { title: 'Overview', href: report(), icon: ChartColumn },
+    { title: 'Generations', href: generations(), icon: Images },
+    { title: 'Users', href: users(), icon: Users },
+    { title: 'Webhook log', href: webhooks(), icon: Webhook },
+];
 
 const footerNavItems: NavItem[] = [
-    {
-        title: 'Pixelforge API docs',
-        href: 'https://pixelforge.promptedit.dev/docs',
-        icon: FileText,
-    },
+    { title: 'Queue (Horizon)', href: '/horizon', icon: Gauge },
+    { title: 'Back to the studio', href: studio(), icon: ArrowLeft },
 ];
 </script>
 
@@ -44,8 +45,20 @@ const footerNavItems: NavItem[] = [
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" as-child>
-                        <Link :href="studio()">
-                            <AppLogo />
+                        <Link :href="report()" class="gap-2">
+                            <span
+                                class="grid size-8 place-items-center rounded-lg bg-primary/12 text-primary"
+                            >
+                                <AppLogoIcon class="size-4.5" />
+                            </span>
+                            <span class="grid leading-tight">
+                                <span class="text-sm font-semibold"
+                                    >PixelForge</span
+                                >
+                                <span class="text-xs text-muted-foreground"
+                                    >Operator console</span
+                                >
+                            </span>
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
