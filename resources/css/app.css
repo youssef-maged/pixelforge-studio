@@ -150,6 +150,31 @@
         font-feature-settings: 'ss01', 'cv11';
     }
 
+    /* Tailwind v4 dropped the pointer cursor on buttons; everything clickable gets it back, disabled things say so. */
+    button:not(:disabled),
+    [role='button']:not([aria-disabled='true']),
+    [role='tab'],
+    [role='menuitem'],
+    [role='menuitemcheckbox'],
+    [role='option'],
+    a[href],
+    summary,
+    select:not(:disabled),
+    label:has(> input:not(:disabled)),
+    input[type='checkbox']:not(:disabled),
+    input[type='radio']:not(:disabled),
+    input[type='file']:not(:disabled) {
+        cursor: pointer;
+    }
+
+    button:disabled,
+    [aria-disabled='true'],
+    input:disabled,
+    select:disabled,
+    textarea:disabled {
+        cursor: not-allowed;
+    }
+
     ::selection {
         background: color-mix(in oklch, var(--primary) 35%, transparent);
     }
@@ -171,30 +196,41 @@
         font-variant-numeric: tabular-nums slashed-zero;
     }
 
-    /* A print developing in the tray: the image surfaces slowly while in flight. */
+    /* A print developing in the tray: a soft band glides across and fully off the edge, so the loop restart is invisible. */
     .developing {
-        background:
-            linear-gradient(
-                    110deg,
-                    transparent 30%,
-                    color-mix(in oklch, var(--primary) 18%, transparent) 50%,
-                    transparent 70%
-                )
-                0 0 / 250% 100%,
-            var(--raised);
-        animation: develop 2.4s ease-in-out infinite;
+        position: relative;
+        overflow: hidden;
+        background: var(--raised);
+    }
+
+    .developing::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+            100deg,
+            transparent 0%,
+            color-mix(in oklch, var(--primary) 12%, transparent) 50%,
+            transparent 100%
+        );
+        transform: translateX(-100%);
+        animation: develop 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+        will-change: transform;
+        pointer-events: none;
+    }
+
+    .developing > * {
+        position: relative;
+        z-index: 1;
     }
 
     @keyframes develop {
-        from {
-            background-position:
-                100% 0,
-                0 0;
+        0% {
+            transform: translateX(-100%);
         }
-        to {
-            background-position:
-                -150% 0,
-                0 0;
+        70%,
+        100% {
+            transform: translateX(100%);
         }
     }
 

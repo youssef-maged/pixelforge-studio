@@ -19,6 +19,15 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectUsersTo('/studio');
 
+        // Signed out mid-session (logged out in another tab, or the session ended): say so instead of a silent bounce.
+        $middleware->redirectGuestsTo(function (Request $request) {
+            if ($request->header('X-Inertia')) {
+                Inertia::flash('toast', ['type' => 'warning', 'message' => 'You were signed out. Sign in again to continue.']);
+            }
+
+            return route('login');
+        });
+
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
         // Pixelforge can't send a CSRF token; its requests are verified by signature instead.

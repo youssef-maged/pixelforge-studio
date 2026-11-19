@@ -77,3 +77,10 @@ it('filters the operator lists and validates their filters', function () {
     $this->actingAs($admin)->get('/admin/users?q=nobody-here')
         ->assertInertia(fn ($page) => $page->component('Admin/Users')->where('users.data', []));
 });
+
+it('tells someone who was signed out mid-session why they are on the login page', function () {
+    $this->post('/generations', [], ['X-Inertia' => 'true'])->assertRedirect('/login');
+
+    expect(session('inertia.flash_data.toast.message') ?? collect(session()->all())->flatten()->first(fn ($v) => is_string($v) && str_contains($v, 'signed out')))
+        ->toContain('signed out');
+});
