@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +36,13 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('purchases', fn (Request $request) => Limit::perMinute(5)->by($request->user()?->id ?: $request->ip()));
 
         Gate::define('view-admin-report', fn (User $user) => $user->is_admin);
+
+        if ($this->app->isLocal()) {
+            // `composer run dev` also runs the scheduler (the missed-webhook safety net) and a public tunnel,
+            // because Pixelforge only delivers webhooks to public URLs.
+            DevCommands::artisan('schedule:work', 'scheduler');
+            DevCommands::register('cloudflared tunnel --no-autoupdate --url http://localhost:'.env('SERVER_PORT', 8000), 'tunnel');
+        }
     }
 
     /**

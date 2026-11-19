@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Pixelforge\PixelforgeClient;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -160,3 +161,13 @@ it('fails for free when Pixelforge refuses outright', function (int $status, str
     'daily quota' => [429, 'daily_limit_exceeded'],
     'validation' => [422, 'validation_failed'],
 ]);
+
+it('really queues the submission on the database queue, in the same transaction', function () {
+    config(['queue.default' => 'database']);
+    $user = User::factory()->create(['balance_nano' => 10_000_000_000]);
+
+    $this->actingAs($user)->post('/generations', submitForm())->assertRedirect('/studio');
+
+    $job = DB::table('jobs')->sole();
+    expect(json_decode($job->payload, true)['displayName'])->toBe(SubmitGeneration::class);
+});

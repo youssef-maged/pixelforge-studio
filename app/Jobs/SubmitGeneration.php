@@ -57,7 +57,7 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
         try {
             $response = $pixelforge->createGeneration($generation);
         } catch (ConnectionException) {
-            $this->release($this->backoff());
+            $this->release($this->nextDelay());
 
             return; // unknown outcome: retry with the same key, which is always safe
         }
@@ -72,7 +72,7 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
 
         if (in_array($code, self::TRY_LATER, true) || $response->serverError()) {
             if ($response->serverError() && $code !== 'overloaded') {
-                $this->release($this->backoff()); // an unexplained 5xx is an unknown outcome too
+                $this->release($this->nextDelay()); // an unexplained 5xx is an unknown outcome too
 
                 return;
             }
@@ -83,7 +83,7 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
-            $this->release(max((int) $response->header('Retry-After'), $this->backoff()));
+            $this->release(max((int) $response->header('Retry-After'), $this->nextDelay()));
 
             return;
         }
@@ -97,7 +97,7 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
     }
 
     /** 2 s, 4 s, 8 s … capped at a minute, plus jitter so queued users don't knock in lockstep. */
-    private function backoff(): int
+    private function nextDelay(): int
     {
         return min(60, 2 ** min($this->attempts(), 6)) + random_int(0, 2);
     }

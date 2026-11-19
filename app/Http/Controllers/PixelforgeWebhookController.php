@@ -8,6 +8,7 @@ use App\Models\WebhookEvent;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -21,7 +22,11 @@ class PixelforgeWebhookController extends Controller
     {
         $payload = $request->getContent();
 
-        abort_unless($this->signatureIsValid($payload, (string) $request->header('Pixelforge-Signature')), 400, 'Invalid Pixelforge signature.');
+        $problem = $this->signatureProblem($payload, (string) $request->header('Pixelforge-Signature'));
+        if ($problem !== null) {
+            Log::warning('Rejected a Pixelforge webhook: '.$problem, ['event' => $request->header('Pixelforge-Event-Id')]);
+            abort(400, 'Invalid Pixelforge signature.');
+        }
 
         $event = json_decode($payload, true, flags: JSON_THROW_ON_ERROR);
         if ($event['type'] === 'ping') {
@@ -62,8 +67,11 @@ class PixelforgeWebhookController extends Controller
             ?? Generation::firstWhere('provider_id', $object['id'] ?? null);
     }
 
-    /** `t=<unix>,v1=<hex hmac>`: HMAC-SHA256 of "<t>.<raw body>", constant-time compared, recent timestamps only. */
-    private function signatureIsValid(string $payload, string $header): bool
+    /**
+     * `t=<unix>,v1=<hex hmac>`: HMAC-SHA256 of "<t>.<raw body>", constant-time compared, recent timestamps only.
+     * Returns why the signature is unacceptable, or null when it is valid.
+     */
+    private function signatureProblem(string $payload, string $header): ?string
     {
         $timestamp = null;
         $signatures = [];
@@ -78,18 +86,23 @@ class PixelforgeWebhookController extends Controller
         }
 
         $secret = (string) config('services.pixelforge.webhook_secret');
-        if ($timestamp === null || $secret === '' || abs(time() - $timestamp) > config('services.pixelforge.webhook_tolerance')) {
-            return false;
+        if ($secret === '') {
+            return 'no signing secret is configured';
+        }
+        if ($timestamp === null || $signatures === []) {
+            return 'malformed signature header';
+        }
+        if (abs(time() - $timestamp) > config('services.pixelforge.webhook_tolerance')) {
+            return 'timestamp outside the tolerance window (skew '.(time() - $timestamp).'s)';
         }
 
         $expected = hash_hmac('sha256', "{$timestamp}.{$payload}", $secret);
-
         foreach ($signatures as $signature) {
             if (hash_equals($expected, $signature)) {
-                return true;
+                return null;
             }
         }
 
-        return false;
+        return 'signature mismatch';
     }
 }
