@@ -34,7 +34,9 @@ class CreditsController extends Controller
 
     public function store(BuyCreditsRequest $request, BuyCredits $buy): RedirectResponse
     {
-        $buy($request->user(), (int) $request->integer('pack'), $request->string('idempotency_key'));
+        $purchase = $buy($request->user(), $request->integer('pack'), $request->string('idempotency_key')->value());
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Added $'.rtrim(rtrim(Nano::toDecimal($purchase->amount_nano), '0'), '.').' in credits.']);
 
         return back();
     }
