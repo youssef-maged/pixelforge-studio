@@ -7,6 +7,8 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -29,6 +31,24 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Friendly pages instead of framework ones; a stale session sends you to sign in with an explanation.
+        $exceptions->respond(function (Response $response, Throwable $e, Request $request) {
+            $status = $response->getStatusCode();
+
+            if ($status === 419) {
+                Inertia::flash('toast', ['type' => 'warning', 'message' => 'Your session expired. Sign in again to continue.']);
+
+                return $request->user() ? back() : redirect()->route('login');
+            }
+
+            $friendly = [403, 404, 503, ...(app()->hasDebugModeEnabled() ? [] : [500])];
+            if (in_array($status, $friendly, true) && ! $request->is('webhooks/*') && ! $request->expectsJson()) {
+                return Inertia::render('ErrorPage', ['status' => $status])->toResponse($request)->setStatusCode($status);
+            }
+
+            return $response;
+        });
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*', 'webhooks/*') || $request->expectsJson(),
         );

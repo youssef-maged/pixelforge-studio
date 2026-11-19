@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
+import OfflineBanner from '@/components/OfflineBanner.vue';
 import PrintWall from '@/components/marketing/PrintWall.vue';
 import { home } from '@/routes';
 
@@ -40,5 +41,6 @@ const PROMISES = [
                 </li>
             </ul>
         </aside>
+        <OfflineBanner />
     </div>
 </template>

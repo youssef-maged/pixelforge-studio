@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { Head, InfiniteScroll, Link, useForm, usePage, usePoll } from '@inertiajs/vue3';
 import { FlaskConical, ImagePlus, X } from '@lucide/vue';
+import { useOnline } from '@vueuse/core';
 import { computed, reactive, ref, watch } from 'vue';
+import { toast } from 'vue-sonner';
 import InputError from '@/components/InputError.vue';
 import GenerationDialog from '@/components/studio/GenerationDialog.vue';
 import GenerationTile from '@/components/studio/GenerationTile.vue';
@@ -122,6 +124,7 @@ function submit(): void {
         preserveScroll: true,
         reset: ['generations'],
         onSuccess: () => {
+            toast.success('Sent to Pixelforge', { description: `Up to ${usd(estimate.value, { round: 'up' })} is held until it finishes.` });
             composer.reset('prompt', 'reference_images');
             composer.client_request_id = crypto.randomUUID();
         },
@@ -145,7 +148,18 @@ function retry(generation: Generation): void {
 const latest = reactive(new Map<string, Generation>());
 watch(
     () => props.watched,
-    (watched) => watched?.data.forEach((g) => latest.set(g.id, g)),
+    (watched) =>
+        watched?.data.forEach((g) => {
+            const before = latest.get(g.id) ?? props.generations.data.find((p) => p.id === g.id);
+            if (before?.in_flight && !g.in_flight) {
+                if (g.status === 'succeeded') {
+                    toast.success('Image ready', { description: `Charged ${usd(g.charge ?? '0')} (estimate was up to ${usd(g.estimate, { round: 'up' })}).` });
+                } else {
+                    toast.error('Generation failed · not charged', { description: g.failure_reason ?? undefined });
+                }
+            }
+            latest.set(g.id, g);
+        }),
 );
 const prints = computed(() => props.generations.data.map((g) => latest.get(g.id) ?? g));
 // Keep an open dialog in step with live updates.
@@ -161,7 +175,9 @@ const poll = usePoll(
     () => ({ only: ['watched', 'credits'], data: { watch: inFlightIds.value }, preserveUrl: true }),
     { autoStart: false, mode: 'rest' },
 );
-watch(inFlightIds, (ids) => (ids.length ? poll.start() : poll.stop()), { immediate: true });
+// Poll only while something is in flight and we're online; resume as soon as the connection is back.
+const online = useOnline();
+watch([inFlightIds, online], ([ids, isOnline]) => (ids.length && isOnline ? poll.start() : poll.stop()), { immediate: true });
 </script>
 
 <template>

@@ -60,6 +60,28 @@ function toggleDay(date: string): void {
     }
 }
 
+function clearFilters(): void {
+    form.value.q = '';
+    form.value.mismatches = false;
+    apply();
+}
+
+function widenRange(): void {
+    const to = new Date();
+    const from = new Date(to.getTime() - 91 * 86_400_000);
+    form.value.from = from.toISOString().slice(0, 10);
+    form.value.to = to.toISOString().slice(0, 10);
+    apply();
+}
+
+const emptyMessage = computed(() =>
+    props.filters.mismatches
+        ? { title: 'Every day in this range matches Pixelforge', hint: 'Nothing to reconcile. Turn off the filter to see all days.' }
+        : props.filters.q
+          ? { title: `Nothing finished for users matching "${props.filters.q}"`, hint: 'Search matches names and email addresses. Try part of an email, or widen the dates.' }
+          : { title: 'No generations finished in this range', hint: 'Generations count on the UTC day they finish. Try a wider range.' },
+);
+
 function sortBy(column: string): void {
     apply({ tab: 'users', sort: column, dir: props.filters.sort === column && props.filters.dir === 'desc' ? 'asc' : 'desc' });
 }
@@ -270,31 +292,36 @@ const tooltip = (config: ChartConfig) =>
                                     <span v-else class="text-muted-foreground">{{ day.pixelforge_cost ? usd(day.pixelforge_cost) : '—' }}</span>
                                 </td>
                             </tr>
-                            <tr v-if="openDay === day.date" class="border-b bg-raised/40">
-                                <td colspan="6" class="px-4 py-3">
-                                    <p v-if="!dayUsers" class="text-xs text-muted-foreground">Loading…</p>
-                                    <p v-else-if="!dayUsers.data.length" class="text-xs text-muted-foreground">No finished generations this day.</p>
-                                    <table v-else class="w-full text-xs">
-                                        <tbody>
-                                            <tr v-for="user in dayUsers.data" :key="user.user_id">
-                                                <td class="py-1.5 pl-5">{{ user.name }} <span class="text-muted-foreground">{{ user.email }}</span></td>
-                                                <td class="receipt py-1.5 text-right text-muted-foreground">{{ user.succeeded }} · {{ user.failed }} · {{ user.rejected }}</td>
-                                                <td class="receipt py-1.5 text-right" :title="exact(user.charged)">{{ usd(user.charged) }}</td>
-                                                <td class="receipt py-1.5 text-right" :title="exact(user.cost)">{{ usd(user.cost) }}</td>
-                                                <td class="receipt py-1.5 pr-1 text-right" :title="exact(user.profit)">{{ usd(user.profit) }}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                    <nav v-if="dayUsers && dayUsers.links.length > 3" class="mt-2 flex gap-1 pl-5">
-                                        <Link v-for="link in dayUsers.links" :key="link.label" :href="link.url ?? ''" :only="['dayUsers']" preserve-scroll preserve-state
-                                            class="receipt rounded-md border px-2 py-0.5 text-[11px]" :class="[link.active ? 'border-primary text-primary' : '', !link.url ? 'pointer-events-none opacity-40' : '']" v-html="link.label" />
-                                    </nav>
-                                </td>
-                            </tr>
+                            <template v-if="openDay === day.date">
+                                <tr v-if="!dayUsers" class="border-b bg-raised/40">
+                                    <td colspan="6" class="px-4 py-2.5 pl-10"><span class="inline-block h-3 w-40 animate-pulse rounded bg-secondary" aria-label="Loading users" /></td>
+                                </tr>
+                                <tr v-for="user in dayUsers?.data ?? []" v-else :key="user.user_id" class="border-b bg-raised/40 text-xs">
+                                    <td class="px-4 py-2 pl-10">{{ user.name }} <span class="text-muted-foreground">{{ user.email }}</span></td>
+                                    <td class="receipt px-4 py-2 text-right text-muted-foreground">{{ user.succeeded }} · {{ user.failed }} · {{ user.rejected }}</td>
+                                    <td class="receipt px-4 py-2 text-right" :title="exact(user.charged)">{{ usd(user.charged) }}</td>
+                                    <td class="receipt px-4 py-2 text-right" :title="exact(user.cost)">{{ usd(user.cost) }}</td>
+                                    <td class="receipt px-4 py-2 text-right" :title="exact(user.profit)">{{ usd(user.profit) }}</td>
+                                    <td class="px-4 py-2" />
+                                </tr>
+                                <tr v-if="dayUsers && dayUsers.links.length > 3" class="border-b bg-raised/40">
+                                    <td colspan="6" class="px-4 py-2 pl-10">
+                                        <nav class="flex gap-1" aria-label="Users on this day">
+                                            <Link v-for="link in dayUsers.links" :key="link.label" :href="link.url ?? ''" :only="['dayUsers']" preserve-scroll preserve-state
+                                                class="receipt rounded-md border px-2 py-0.5 text-[11px]" :class="[link.active ? 'border-primary text-primary' : '', !link.url ? 'pointer-events-none opacity-40' : '']" v-html="link.label" />
+                                        </nav>
+                                    </td>
+                                </tr>
+                            </template>
                         </template>
                         <tr v-if="!days.data.length">
-                            <td colspan="6" class="px-4 py-10 text-center text-sm text-muted-foreground">
-                                {{ filters.mismatches ? 'Every day in this range matches Pixelforge.' : 'No generations finished in this range.' }}
+                            <td colspan="6" class="px-4 py-12 text-center">
+                                <p class="text-sm">{{ emptyMessage.title }}</p>
+                                <p class="mt-1 text-xs text-muted-foreground">{{ emptyMessage.hint }}</p>
+                                <div class="mt-3 flex justify-center gap-2">
+                                    <Button v-if="filters.q || filters.mismatches" size="sm" variant="secondary" @click="clearFilters">Clear filters</Button>
+                                    <Button size="sm" variant="ghost" @click="widenRange">Show the last 92 days</Button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -320,7 +347,14 @@ const tooltip = (config: ChartConfig) =>
                             <td class="receipt px-4 py-2.5 text-right" :title="exact(user.profit)">{{ usd(user.profit) }}</td>
                         </tr>
                         <tr v-if="!users.data.length">
-                            <td colspan="5" class="px-4 py-10 text-center text-sm text-muted-foreground">No users with finished generations in this range.</td>
+                            <td colspan="5" class="px-4 py-12 text-center">
+                                <p class="text-sm">{{ filters.q ? `No users match "${filters.q}"` : 'No users finished a generation in this range' }}</p>
+                                <p class="mt-1 text-xs text-muted-foreground">Search matches names and email addresses. Try part of an email, or widen the dates.</p>
+                                <div class="mt-3 flex justify-center gap-2">
+                                    <Button v-if="filters.q" size="sm" variant="secondary" @click="clearFilters">Clear search</Button>
+                                    <Button size="sm" variant="ghost" @click="widenRange">Show the last 92 days</Button>
+                                </div>
+                            </td>
                         </tr>
                     </tbody>
                 </table>

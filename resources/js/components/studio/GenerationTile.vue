@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { AlertTriangle, RotateCcw } from '@lucide/vue';
+import { useNow } from '@vueuse/core';
 import { computed } from 'vue';
 import { Button } from '@/components/ui/button';
 import { exact, usd } from '@/lib/money';
@@ -9,6 +10,14 @@ const props = defineProps<{ generation: Generation }>();
 defineEmits<{ open: [generation: Generation]; retry: [generation: Generation] }>();
 
 const g = computed(() => props.generation);
+
+// A ticking clock so a slow generation visibly progresses instead of looking frozen.
+const now = useNow({ interval: 1000 });
+const elapsed = computed(() => {
+    const seconds = Math.max(0, Math.floor((now.value.getTime() - Date.parse(g.value.created_at)) / 1000));
+    return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, '0')}s`;
+});
+const busyForAWhile = computed(() => g.value.status === 'pending' && now.value.getTime() - Date.parse(g.value.created_at) > 30_000);
 
 const stage = computed(
     () =>
@@ -62,9 +71,12 @@ const stage = computed(
         >
             <span class="inline-flex items-center gap-1.5 self-start rounded-full bg-background/70 px-2.5 py-1 text-xs font-medium backdrop-blur">
                 <span class="size-1.5 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
-                {{ stage }}
+                {{ stage }} <span class="receipt font-normal text-muted-foreground">{{ elapsed }}</span>
             </span>
             <span class="flex flex-col gap-1">
+                <span v-if="busyForAWhile" class="text-xs text-muted-foreground">
+                    Pixelforge is at capacity. We keep trying for up to 15 minutes, and you're not charged if it never starts.
+                </span>
                 <span class="line-clamp-2 text-sm">{{ g.prompt }}</span>
                 <span class="receipt text-xs text-muted-foreground" :title="exact(g.estimate)">
                     up to {{ usd(g.estimate, { round: 'up' }) }}
