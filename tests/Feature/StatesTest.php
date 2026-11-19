@@ -67,6 +67,9 @@ it('keeps every operator page and Horizon for admins', function () {
         $this->actingAs($admin)->get($url)->assertOk();
     }
     $this->actingAs($user)->get('/horizon')->assertForbidden();
+
+    app()['env'] = 'local'; // Horizon's stock gate opens up for everyone in local; ours doesn't
+    $this->actingAs($user)->get('/horizon')->assertForbidden();
 });
 
 it('filters the operator lists and validates their filters', function () {

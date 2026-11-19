@@ -21,9 +21,18 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
     }
 
     /**
+     * Operators only, in every environment. Horizon's default also lets anyone in when APP_ENV=local,
+     * which would make the local app disagree with production about who can see the queue.
+     */
+    protected function authorization(): void
+    {
+        $this->gate();
+
+        Horizon::auth(fn ($request) => Gate::check('viewHorizon', [$request->user()]));
+    }
+
+    /**
      * Register the Horizon gate.
-     *
-     * This gate determines who can access Horizon in non-local environments.
      */
     protected function gate(): void
     {
