@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\Nano;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -41,6 +42,11 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            'credits' => fn () => $request->user() ? [
+                'balance' => Nano::toDecimal($request->user()->balance_nano),
+                'held' => Nano::toDecimal($held = $request->user()->heldNano()),
+                'available' => Nano::toDecimal($request->user()->balance_nano - $held),
+            ] : null,
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

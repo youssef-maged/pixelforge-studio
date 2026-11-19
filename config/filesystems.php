@@ -28,6 +28,9 @@ return [
     |
     */
 
+    // Where copies of generated images live (a private Laravel Cloud bucket in production).
+    'images' => env('IMAGES_DISK', 'local'),
+
     'disks' => [
 
         'local' => [

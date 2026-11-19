@@ -17,6 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
+        // Pixelforge can't send a CSRF token; its requests are verified by signature instead.
+        $middleware->preventRequestForgery(except: ['webhooks/pixelforge']);
+
         $middleware->web(append: [
             HandleAppearance::class,
             HandleInertiaRequests::class,

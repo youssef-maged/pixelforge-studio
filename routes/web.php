@@ -1,11 +1,28 @@
 <?php
 
+use App\Http\Controllers\Admin\ReportController;
+use App\Http\Controllers\CreditsController;
+use App\Http\Controllers\PixelforgeWebhookController;
+use App\Http\Controllers\StudioController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+Route::middleware('auth')->group(function () {
+    Route::redirect('dashboard', 'studio')->name('dashboard');
+
+    Route::get('studio', [StudioController::class, 'index'])->name('studio');
+    Route::post('generations', [StudioController::class, 'store'])->middleware('throttle:generations')->name('generations.store');
+
+    Route::get('credits', [CreditsController::class, 'index'])->name('credits');
+    Route::post('credits', [CreditsController::class, 'store'])->middleware('throttle:purchases')->name('credits.store');
+
+    Route::middleware('can:view-admin-report')->group(function () {
+        Route::get('admin/report', [ReportController::class, 'index'])->name('admin.report');
+        Route::get('admin/report/export', [ReportController::class, 'export'])->name('admin.report.export');
+    });
 });
+
+Route::post('webhooks/pixelforge', PixelforgeWebhookController::class)->name('webhooks.pixelforge');
 
 require __DIR__.'/settings.php';
