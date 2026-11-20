@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // A slowly drifting wall of real generations from this app (public/showcase), used on the landing and sign-in pages.
-const SHOWCASE_COUNT = 4;
+const SHOWCASE_COUNT = 6;
 const prints = (offset: number) =>
     Array.from(
         { length: 8 },
