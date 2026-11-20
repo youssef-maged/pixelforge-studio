@@ -1,0 +1,21 @@
+# Local services only: Postgres (app + test databases) and Redis for the queue, cache and locks.
+# Ports are unusual on purpose so they don't clash with other projects; .env.example matches them.
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: pixelforge-pg
+    environment:
+      POSTGRES_USER: pixelforge
+      POSTGRES_PASSWORD: pixelforge
+      POSTGRES_DB: pixelforge
+    ports: ["127.0.0.1:54360:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/create-test-db.sql:/docker-entrypoint-initdb.d/create-test-db.sql:ro
+  redis:
+    image: redis:7-alpine
+    container_name: pixelforge-redis
+    ports: ["127.0.0.1:46379:6379"]
+
+volumes:
+  pgdata:
