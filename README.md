@@ -37,7 +37,7 @@ Laravel 13 · Inertia 3 · Vue 3.5 · shadcn-vue · Tailwind v4 · Postgres 17 �
   retried POST can never create a second Pixelforge generation, and webhooks map back even before we know their id.
 - **Submitting** is a queued job, dispatched after commit. Busy answers (429 concurrency/rate limit, 503 overloaded)
   are retried after `Retry-After` for up to 15 minutes, then failed for free. A timeout or 5xx is an
-  *unknown outcome*: Pixelforge may have created it, so we never fail it locally; we re-POST with the same key
+  _unknown outcome_: Pixelforge may have created it, so we never fail it locally; we re-POST with the same key
   until Pixelforge answers definitely.
 - **Webhooks** are verified (HMAC-SHA256 over timestamp + raw body, constant-time compare, recent timestamps only),
   then recorded and applied in one transaction. The event id is unique, so a duplicate delivery is recorded once
