@@ -32,6 +32,9 @@
         <env name="DB_PASSWORD" value="pixelforge"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
+        <!-- Tests never use real Pixelforge credentials from .env -->
+        <env name="PIXELFORGE_API_KEY" value="pf_test_key"/>
+        <env name="PIXELFORGE_WEBHOOK_SECRET" value="whsec_test"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
