@@ -145,3 +145,11 @@ it('rechecks Pixelforge once, then drops refresh from the address', function () 
         ->assertRedirect('/admin/report?from=2026-11-04&to=2026-11-04');
     Http::assertSentCount(1);
 });
+
+it('shows no rows for a user filter that matches nobody, even on days Pixelforge was busy', function () {
+    finished($this->ann, '2026-11-04 10:00:00', 305_510_000);
+    Http::fake(['*/v1/usage*' => Http::response(['data' => [usageDay('2026-11-04', 1, '0.305510000')]])]);
+
+    $this->actingAs($this->admin)->get('/admin/report?from=2026-11-04&to=2026-11-04&q=zzz')
+        ->assertInertia(fn ($page) => $page->where('days.total', 0)->where('summary.mismatched_days', 0));
+});

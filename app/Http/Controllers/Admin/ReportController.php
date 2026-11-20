@@ -168,7 +168,8 @@ class ReportController extends Controller
     {
         $reconciled = [];
         foreach ($days as $date => $day) {
-            $theirs = $usage[$day['date']] ?? null;
+            // Pixelforge's figure covers every user, so it has nothing to say about one user's slice.
+            $theirs = $filtered ? null : ($usage[$day['date']] ?? null);
             $theirCost = $theirs ? Nano::fromDecimal($theirs['cost_usd']) : null;
 
             $reconciled[$date] = [
@@ -176,8 +177,8 @@ class ReportController extends Controller
                 'pixelforge_cost_nano' => $theirCost,
                 'pixelforge_cost' => $theirCost === null ? null : Nano::toDecimal($theirCost),
                 'pixelforge_generations' => $theirs['generations'] ?? null,
-                'match' => $theirs === null || $filtered ? null : ($theirCost === $day['cost_nano'] && $theirs['generations'] === $day['succeeded']),
-                'delta' => $theirCost === null || $filtered ? null : Nano::toDecimal($day['cost_nano'] - $theirCost),
+                'match' => $theirs === null ? null : ($theirCost === $day['cost_nano'] && $theirs['generations'] === $day['succeeded']),
+                'delta' => $theirCost === null ? null : Nano::toDecimal($day['cost_nano'] - $theirCost),
             ];
         }
 

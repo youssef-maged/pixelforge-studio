@@ -155,15 +155,19 @@ function submit(): void {
     if (!canSubmit.value) {
         return;
     }
+    // Remember what was sent: the user may already be typing the next prompt when this one returns.
+    const sent = { prompt: composer.prompt, estimate: estimate.value };
     composer.post(store().url, {
         preserveScroll: true,
         reset: ['generations'],
         onSuccess: () => {
             toast.success('Sent to Pixelforge', {
-                description: `Up to ${usd(estimate.value, { round: 'up' })} is held until it finishes.`,
+                description: `Up to ${usd(sent.estimate, { round: 'up' })} is held until it finishes.`,
             });
-            composer.reset('prompt', 'reference_images');
-            composer.client_request_id = crypto.randomUUID();
+            if (composer.prompt === sent.prompt) {
+                composer.reset('prompt', 'reference_images');
+                composer.client_request_id = crypto.randomUUID();
+            }
         },
     });
 }
