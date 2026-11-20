@@ -7,7 +7,7 @@ import {
     VisStackedBar,
     VisXYContainer,
 } from '@unovis/vue';
-import { useDebounceFn } from '@vueuse/core';
+import { useDebouncedVisit } from '@/composables/useDebouncedVisit';
 import {
     Check,
     ChevronRight,
@@ -92,6 +92,10 @@ defineOptions({
 });
 
 // --- Filters live in the URL ---------------------------------------------------------------------
+// --- Expanding a day into its users (declared first: changing filters closes it) -------------
+const openDay = ref<string | null>(null);
+const loadedDay = ref<string | null>(null);
+
 const form = ref({
     from: props.filters.from,
     to: props.filters.to,
@@ -108,13 +112,15 @@ const query = (overrides: Record<string, unknown> = {}) => ({
     dir: props.filters.dir,
     ...overrides,
 });
-const apply = (overrides: Record<string, unknown> = {}) =>
+const apply = (overrides: Record<string, unknown> = {}) => {
+    openDay.value = null; // the open day's users belong to the old filters
     router.get(report().url, query(overrides), {
         preserveState: true,
         preserveScroll: true,
         replace: true,
     });
-const applySearch = useDebounceFn(() => apply(), 350);
+};
+const applySearch = useDebouncedVisit(() => apply(), 350);
 const exportUrl = computed(() => {
     const params = Object.fromEntries(
         Object.entries(query())
@@ -125,17 +131,29 @@ const exportUrl = computed(() => {
     return exportReport({ query: params }).url;
 });
 
-// --- Expanding a day into its users ----------------------------------------------------------------
-const openDay = ref<string | null>(null);
 function toggleDay(date: string): void {
     openDay.value = openDay.value === date ? null : date;
     if (openDay.value) {
-        router.reload({
-            only: ['dayUsers'],
-            data: { day: date, day_page: 1 },
-            preserveUrl: true,
-        });
+        loadDay(date);
     }
+}
+
+// Rows are only shown under the day they belong to; an answer for a day that's no longer open
+// triggers a load for the one that is.
+function loadDay(date: string): void {
+    loadedDay.value = null;
+    router.reload({
+        only: ['dayUsers'],
+        data: { day: date, day_page: 1 },
+        preserveUrl: true,
+        onSuccess: () => {
+            if (openDay.value === date) {
+                loadedDay.value = date;
+            } else if (openDay.value) {
+                loadDay(openDay.value);
+            }
+        },
+    });
 }
 
 function clearFilters(): void {
@@ -745,7 +763,7 @@ const tooltip = (config: ChartConfig) =>
                             </tr>
                             <template v-if="openDay === day.date">
                                 <tr
-                                    v-if="!dayUsers"
+                                    v-if="!dayUsers || loadedDay !== openDay"
                                     class="border-b bg-raised/40"
                                 >
                                     <td colspan="6" class="px-4 py-2.5 pl-10">

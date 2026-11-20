@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { useDebounceFn } from '@vueuse/core';
+import { useDebouncedVisit } from '@/composables/useDebouncedVisit';
 import { ref } from 'vue';
 import Pagination from '@/components/admin/Pagination.vue';
 import { Button } from '@/components/ui/button';
@@ -41,7 +41,7 @@ const go = (params: Record<string, unknown> = {}) =>
         },
         { preserveState: true, replace: true },
     );
-const search = useDebounceFn(() => go(), 350);
+const search = useDebouncedVisit(() => go(), 350);
 const when = (iso: string) =>
     new Date(iso).toLocaleString(undefined, {
         month: 'short',

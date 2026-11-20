@@ -19,6 +19,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectUsersTo('/studio');
 
+        // Laravel Cloud terminates TLS at its load balancer; trust it so URLs, signed links and client IPs are right.
+        $middleware->trustProxies(at: '*');
+
         // Signed out mid-session (logged out in another tab, or the session ended): say so instead of a silent bounce.
         $middleware->redirectGuestsTo(function (Request $request) {
             if ($request->header('X-Inertia')) {
@@ -50,8 +53,19 @@ return Application::configure(basePath: dirname(__DIR__))
                 return $request->user() ? back() : redirect()->route('login');
             }
 
+            // One of our own rate limits (generations, uploads, purchases): say so instead of a raw error page.
+            if ($status === 429 && $request->header('X-Inertia')) {
+                $wait = (int) ($response->headers->get('Retry-After') ?: 60);
+                Inertia::flash('toast', ['type' => 'warning', 'message' => "Too many tries in a short time. Wait {$wait} seconds and try again."]);
+
+                return back();
+            }
+
             $friendly = [403, 404, 503, ...(app()->hasDebugModeEnabled() ? [] : [500])];
-            if (in_array($status, $friendly, true) && ! $request->is('webhooks/*') && ! $request->expectsJson()) {
+            // A background partial reload (the Studio's live status) is never swapped for an error page;
+            // it gets the plain error, which the poll ignores and retries.
+            $background = $request->hasHeader('X-Inertia-Partial-Component');
+            if (in_array($status, $friendly, true) && ! $background && ! $request->is('webhooks/*') && ! $request->expectsJson()) {
                 return Inertia::render('ErrorPage', ['status' => $status])->toResponse($request)->setStatusCode($status);
             }
 

@@ -7,6 +7,7 @@ use App\Http\Requests\AdminReportRequest;
 use App\Pixelforge\PixelforgeClient;
 use App\Reports\AdminReport;
 use App\Support\Nano;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -21,16 +22,25 @@ class ReportController extends Controller
 {
     public function __construct(private PixelforgeClient $pixelforge) {}
 
-    public function index(AdminReportRequest $request): Response
+    public function index(AdminReportRequest $request): Response|RedirectResponse
     {
         $report = $request->report();
-        $pixelforge = $this->pixelforgeUsage($report, $request->boolean('refresh'));
+
+        // "Recheck Pixelforge" refreshes the cached figures once, then drops the flag from the address,
+        // so later filter clicks and links go back to the 5-minute cache.
+        if ($request->boolean('refresh')) {
+            $this->pixelforgeUsage($report, refresh: true);
+
+            return redirect($request->fullUrlWithoutQuery('refresh'));
+        }
+
+        $pixelforge = $this->pixelforgeUsage($report);
         $days = $this->reconcile($report->days(), $pixelforge['days'] ?? null, $report->search !== null);
 
         // Quiet days (nothing on our side or Pixelforge's) stay in the charts but not in the table.
         $active = $days->reverse()->values()->reject(fn (array $day) => $day['succeeded'] + $day['failed'] + $day['rejected'] === 0
             && ($day['pixelforge_generations'] ?? 0) === 0)->values();
-        $listed = $active->when($request->boolean('mismatches'), fn (Collection $rows) => $rows->where('match', false)->values());
+        $listed = $active->when($request->boolean('mismatches'), fn (Collection $rows) => $rows->whereStrict('match', false)->values());
         $page = LengthAwarePaginator::resolveCurrentPage();
 
         $cumulative = 0;
@@ -56,7 +66,7 @@ class ReportController extends Controller
                 'verified' => $pixelforge !== null,
                 'filtered' => $report->search !== null,
                 'checked_at' => $pixelforge['checked_at'] ?? null,
-                'mismatched_days' => $days->where('match', false)->count(),
+                'mismatched_days' => $days->whereStrict('match', false)->count(),
                 'quiet_days' => $days->count() - $active->count(),
                 'pixelforge_cost' => isset($pixelforge) ? Nano::toDecimal($days->sum('pixelforge_cost_nano')) : null,
             ],
@@ -97,8 +107,10 @@ class ReportController extends Controller
         $report = $request->report();
         $byUser = $request->input('tab') === 'users';
         $rows = $byUser
-            ? $report->users($request->input('sort', 'charged'), $request->input('dir', 'desc'))->get()->map(fn (stdClass $row) => [$row->name, $row->email, ...array_values(self::csvFigures(AdminReport::figures($row)))])
+            ? $report->users($request->input('sort', 'charged'), $request->input('dir', 'desc'))->get()->map(fn (stdClass $row) => [self::spreadsheetSafe($row->name), self::spreadsheetSafe($row->email), ...array_values(self::csvFigures(AdminReport::figures($row)))])
             : $this->reconcile($report->days(), $this->pixelforgeUsage($report)['days'] ?? null, $report->search !== null)
+                // Every day stays in (a spreadsheet wants no gaps) unless the view is narrowed to mismatches.
+                ->when($request->boolean('mismatches'), fn (Collection $days) => $days->whereStrict('match', false))
                 ->reverse()->map(fn ($day) => [$day['date'], ...array_values(self::csvFigures($day)), $day['pixelforge_cost'] ?? '', match ($day['match']) {
                     true => 'yes', false => 'no', default => ''
                 }]);
@@ -111,9 +123,9 @@ class ReportController extends Controller
 
         return response()->streamDownload(function () use ($header, $rows) {
             $out = fopen('php://output', 'w') ?: throw new RuntimeException('Could not open the CSV output stream.');
-            fputcsv($out, $header);
+            fputcsv($out, $header, escape: '');
             foreach ($rows as $row) {
-                fputcsv($out, $row);
+                fputcsv($out, $row, escape: '');
             }
             fclose($out);
         }, $name, ['Content-Type' => 'text/csv']);
@@ -170,6 +182,14 @@ class ReportController extends Controller
         }
 
         return collect($reconciled);
+    }
+
+    /**
+     * Text typed by users (a name like "=HYPERLINK(...)") is kept as text, never run as a spreadsheet formula.
+     */
+    private static function spreadsheetSafe(string $cell): string
+    {
+        return $cell !== '' && in_array($cell[0], ['=', '+', '-', '@', "\t", "\r"], true) ? "'".$cell : $cell;
     }
 
     /**

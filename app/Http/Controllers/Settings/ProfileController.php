@@ -9,6 +9,8 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -52,7 +54,23 @@ class ProfileController extends Controller
 
         Auth::logout();
 
-        $user->delete();
+        // Billing history must outlive the account (the admin report reconciles against Pixelforge), so the
+        // person is erased and the money records stay, pointing at an anonymous user who can't sign in.
+        DB::transaction(function () use ($user) {
+            $user->forceFill([
+                'name' => 'Deleted user',
+                'email' => "deleted-{$user->id}@users.invalid",
+                'password' => Str::random(64),
+                'remember_token' => null,
+                'two_factor_secret' => null,
+                'two_factor_recovery_codes' => null,
+                'two_factor_confirmed_at' => null,
+                'is_admin' => false,
+            ])->save();
+
+            DB::table('passkeys')->where('user_id', $user->id)->delete();
+            DB::table('sessions')->where('user_id', $user->id)->delete();
+        });
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

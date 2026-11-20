@@ -33,7 +33,10 @@ class AppServiceProvider extends ServiceProvider
 
         // Our own limits, so one user or script can't burn the shared Pixelforge allowance.
         RateLimiter::for('generations', fn (Request $request) => Limit::perMinute(10)->by($request->user()?->id ?: $request->ip()));
-        RateLimiter::for('uploads', fn (Request $request) => Limit::perMinute(20)->by($request->user()?->id ?: $request->ip()));
+        RateLimiter::for('uploads', fn (Request $request) => [ // a daily cap too, so one account can't fill the bucket
+            Limit::perMinute(20)->by($request->user()?->id ?: $request->ip()),
+            Limit::perDay(100)->by('day:'.($request->user()?->id ?: $request->ip())),
+        ]);
         RateLimiter::for('purchases', fn (Request $request) => Limit::perMinute(5)->by($request->user()?->id ?: $request->ip()));
 
         Gate::define('view-admin-report', fn (User $user) => $user->is_admin);

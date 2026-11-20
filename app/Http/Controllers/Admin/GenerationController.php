@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\GenerationStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Generation;
+use App\Support\Like;
 use App\Support\Nano;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -25,10 +26,10 @@ class GenerationController extends Controller
         $generations = Generation::query()
             ->with('user:id,name,email')
             ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status))
-            ->when($filters['q'] ?? null, fn (Builder $query, string $search) => $query->where(fn (Builder $query) => $query
-                ->whereLike('prompt', "%{$search}%")
-                ->orWhereLike('provider_id', "%{$search}%")
-                ->orWhereHas('user', fn (Builder $query) => $query->whereLike('name', "%{$search}%")->orWhereLike('email', "%{$search}%"))))
+            ->when(filled($search = $filters['q'] ?? null), fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                ->whereLike('prompt', Like::contains($search))
+                ->orWhereLike('provider_id', Like::contains($search))
+                ->orWhereHas('user', fn (Builder $query) => $query->whereLike('name', Like::contains($search))->orWhereLike('email', Like::contains($search)))))
             ->latest()
             ->paginate(30)
             ->withQueryString()

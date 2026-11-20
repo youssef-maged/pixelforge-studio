@@ -34,16 +34,26 @@ const page = usePage<{ credits: Credits }>();
 const wallet = computed(() => page.props.credits);
 const buying = ref<number | null>(null);
 
+// One key per intended purchase. It's only replaced once that purchase is confirmed (or a different pack is
+// chosen), so retrying after a lost response ("couldn't reach the server") can't buy the same pack twice.
+let intent: { pack: number; key: string } | null = null;
+
 function buy(pack: number): void {
     if (buying.value !== null) {
         return;
     }
+    if (intent?.pack !== pack) {
+        intent = { pack, key: crypto.randomUUID() };
+    }
     buying.value = pack;
-    // A fresh key per click; a retried or doubled request with the same key buys once.
     router.post(
         store().url,
-        { pack, idempotency_key: crypto.randomUUID() },
-        { preserveScroll: true, onFinish: () => (buying.value = null) },
+        { pack, idempotency_key: intent.key },
+        {
+            preserveScroll: true,
+            onSuccess: () => (intent = null),
+            onFinish: () => (buying.value = null),
+        },
     );
 }
 

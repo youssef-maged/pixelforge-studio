@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { useDebounceFn } from '@vueuse/core';
+import { useDebouncedVisit } from '@/composables/useDebouncedVisit';
 import { ref } from 'vue';
 import Pagination from '@/components/admin/Pagination.vue';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,7 @@ defineOptions({
 });
 
 const q = ref(props.filters.q ?? '');
-const search = useDebounceFn(
+const search = useDebouncedVisit(
     () =>
         router.get(
             usersRoute().url,

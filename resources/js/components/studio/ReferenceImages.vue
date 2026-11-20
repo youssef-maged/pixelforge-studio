@@ -86,21 +86,38 @@ async function upload(
             continue;
         }
         http.image = file;
+        let status = 0;
         try {
-            const response = await http.post(uploadRoute().url);
+            const response = await http.post(uploadRoute().url, {
+                onHttpException: (failed) => {
+                    status = failed.status;
+                },
+            });
             uploaded.add(response.url);
             add(response.url);
         } catch {
-            problem.value =
-                http.errors.image ??
-                (navigator.onLine
-                    ? "The upload didn't finish. Try again."
-                    : "You're offline. Try again when you're back.");
+            problem.value = uploadProblem(status);
         }
     }
     if (fileInput.value) {
         fileInput.value.value = '';
     }
+}
+
+function uploadProblem(status: number): string {
+    if (status === 401 || status === 419) {
+        return 'You were signed out. Reload the page and sign in again to continue.';
+    }
+    if (status === 429) {
+        return 'Too many uploads in a short time. Wait a minute and try again.';
+    }
+    if (http.errors.image) {
+        return http.errors.image;
+    }
+
+    return navigator.onLine
+        ? "The upload didn't finish. Try again."
+        : "You're offline. Try again when you're back.";
 }
 
 function remove(index: number): void {

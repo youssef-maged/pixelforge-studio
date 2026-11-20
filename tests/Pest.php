@@ -18,6 +18,7 @@ function pricingList(): array
 function usePricingFixture(): void
 {
     Cache::forever('pixelforge.pricing', pricingList());
+    Cache::forever('pixelforge.pricing.fetched_at', PHP_INT_MAX);
 }
 
 /** A Pixelforge generation object for one of our generations, as the API and webhooks send it. */

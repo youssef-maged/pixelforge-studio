@@ -119,7 +119,12 @@ class ProfileUpdateTest extends TestCase
             ->assertRedirect(route('home'));
 
         $this->assertGuest();
-        $this->assertNull($user->fresh());
+
+        // Anonymised, not removed: billing history stays reconcilable with Pixelforge.
+        $erased = $user->fresh();
+        $this->assertSame('Deleted user', $erased->name);
+        $this->assertSame("deleted-{$user->id}@users.invalid", $erased->email);
+        $this->assertFalse(auth()->attempt(['email' => $user->email, 'password' => 'password']));
     }
 
     public function test_correct_password_must_be_provided_to_delete_account()

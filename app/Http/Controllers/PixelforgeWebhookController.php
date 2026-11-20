@@ -40,7 +40,9 @@ class PixelforgeWebhookController extends Controller
             $isNew = WebhookEvent::query()->insertOrIgnore([
                 'id' => $event['id'],
                 'type' => $event['type'],
-                'generation_id' => $generation?->id,
+                // Linked after apply(): the foreign-key check would lock the generation before apply() locks
+                // its user, breaking the user → generation lock order and risking a deadlock with the submit job.
+                'generation_id' => null,
                 'delivery_attempt' => (int) $request->header('Pixelforge-Delivery-Attempt') ?: null,
                 'payload' => json_encode($event),
                 'received_at' => now(),
@@ -65,7 +67,7 @@ class PixelforgeWebhookController extends Controller
                     : "no change (already {$after->status->value})";
             }
 
-            WebhookEvent::query()->whereKey($event['id'])->update(['outcome' => $outcome]);
+            WebhookEvent::query()->whereKey($event['id'])->update(['outcome' => $outcome, 'generation_id' => $generation?->id]);
         });
 
         return response()->noContent();
@@ -80,8 +82,10 @@ class PixelforgeWebhookController extends Controller
     {
         $ourId = $object['metadata']['generation_id'] ?? null;
 
+        $providerId = $object['id'] ?? null;
+
         return (Str::isUuid($ourId) ? Generation::find($ourId) : null)
-            ?? Generation::firstWhere('provider_id', $object['id'] ?? null);
+            ?? (is_string($providerId) && $providerId !== '' ? Generation::firstWhere('provider_id', $providerId) : null);
     }
 
     /**

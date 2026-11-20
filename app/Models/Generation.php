@@ -34,6 +34,8 @@ use Illuminate\Support\Facades\Storage;
  * @property string|null $image_path
  * @property Carbon|null $started_at
  * @property Carbon|null $completed_at
+ * @property Carbon|null $submit_started_at
+ * @property bool $outcome_unknown
  * @property Carbon $created_at
  * @property Carbon $updated_at
  */
@@ -58,6 +60,8 @@ class Generation extends Model
             'image_url_expires_at' => 'datetime',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
+            'submit_started_at' => 'datetime',
+            'outcome_unknown' => 'boolean',
         ];
     }
 

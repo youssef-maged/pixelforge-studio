@@ -168,6 +168,18 @@ function submit(): void {
     });
 }
 
+// Same request id = "the same submission" (so a retry after a lost response can't create a second one).
+// Any change to what's being asked for makes it a new submission.
+watch(
+    () => [
+        composer.prompt,
+        composer.size,
+        composer.quality,
+        composer.reference_images.join('\n'),
+    ],
+    () => (composer.client_request_id = crypto.randomUUID()),
+);
+
 function retry(generation: Generation): void {
     composer.clearErrors();
     composer.prompt = generation.prompt;
@@ -224,6 +236,10 @@ const poll = usePoll(
         only: ['watched', 'credits'],
         data: { watch: inFlightIds.value },
         preserveUrl: true,
+        // A failed background check is ignored (the next one is 2 s away); it must never replace the page
+        // and wipe a half-typed prompt. Being offline is shown by the banner instead.
+        onHttpException: () => false,
+        onNetworkError: () => false,
     }),
     { autoStart: false, mode: 'rest' },
 );

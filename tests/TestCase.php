@@ -16,6 +16,7 @@ abstract class TestCase extends BaseTestCase
         // Tests never talk to the real Pixelforge.
         Http::preventStrayRequests();
         Cache::forever('pixelforge.pricing', json_decode(file_get_contents(__DIR__.'/Fixtures/pricing.json'), true));
+        Cache::forever('pixelforge.pricing.fetched_at', PHP_INT_MAX);
     }
 
     protected function skipUnlessFortifyHas(string $feature, ?string $message = null): void

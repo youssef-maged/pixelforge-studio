@@ -36,7 +36,7 @@ class AdminReportRequest extends FormRequest
 
     public function report(): AdminReport
     {
-        return new AdminReport($this->rangeStart(), $this->rangeEnd(), $this->string('q')->trim()->value() ?: null);
+        return new AdminReport($this->rangeStart(), $this->rangeEnd(), $this->filled('q') ? $this->string('q')->trim()->value() : null);
     }
 
     /** UTC dates; the default is the last 30 days, ending today. */

@@ -17,7 +17,7 @@ use Illuminate\Http\Client\ConnectionException;
  *
  * Every attempt sends the same Idempotency-Key (our generation id), so a retry can only ever return the
  * generation Pixelforge already has, never create a second one. That makes "unknown outcome" (a timeout)
- * safe to retry, and it is the only kind of failure we never give up on locally.
+ * safe to retry, and once an outcome was unknown we never give up locally: Pixelforge may already have it.
  */
 class SubmitGeneration implements ShouldBeUnique, ShouldQueue
 {
@@ -29,7 +29,11 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
     /** Codes that mean "nothing was created, try again later". */
     private const TRY_LATER = ['rate_limit_exceeded', 'concurrency_limit_exceeded', 'overloaded'];
 
-    public int $uniqueFor = 1200;
+    /**
+     * Just above the longest wait between attempts. Each attempt touches the generation, so the sweep only
+     * re-dispatches one nobody has tried for 2 minutes, i.e. one whose queue message was really lost.
+     */
+    public int $uniqueFor = 150;
 
     public function __construct(public Generation $generation) {}
 
@@ -38,13 +42,21 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
         return $this->generation->id;
     }
 
-    /**
-     * Releases count as attempts, so bound the job by time instead. Evaluated at dispatch, so a job
-     * re-dispatched by ReconcileGenerations gets a fresh window; patience itself is measured from created_at.
-     */
+    /** Releases count as attempts, so bound each dispatch by time; the sweep re-dispatches if it runs out. */
     public function retryUntil(): DateTimeInterface
     {
         return now()->addMinutes(self::PATIENCE_MINUTES + 10);
+    }
+
+    /**
+     * Waits after an unexpected exception (e.g. a deadlock, or pricing unreachable while applying a 202),
+     * so a crash can't turn into a tight loop of POSTs eating the shared rate limit.
+     *
+     * @return list<int>
+     */
+    public function backoff(): array
+    {
+        return [5, 15, 30, 60];
     }
 
     public function handle(PixelforgeClient $pixelforge, RecordGenerationState $record): void
@@ -54,12 +66,15 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
             return; // already accepted (a webhook beat us here) or already given up
         }
 
+        $generation->submit_started_at ??= now();
+        $generation->touch(); // saves submit_started_at too; tells the sweep this generation is being worked on
+
         try {
             $response = $pixelforge->createGeneration($generation);
         } catch (ConnectionException) {
-            $this->release($this->nextDelay());
+            $this->unknownOutcome($generation);
 
-            return; // unknown outcome: retry with the same key, which is always safe
+            return;
         }
 
         if ($response->status() === 202) {
@@ -70,14 +85,16 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
 
         $code = (string) $response->json('error.code', 'http_'.$response->status());
 
-        if (in_array($code, self::TRY_LATER, true) || $response->serverError()) {
-            if ($response->serverError() && $code !== 'overloaded') {
-                $this->release($this->nextDelay()); // an unexplained 5xx is an unknown outcome too
+        if ($response->serverError() && $code !== 'overloaded') {
+            $this->unknownOutcome($generation); // an unexplained 5xx is an unknown outcome too
 
-                return;
-            }
+            return;
+        }
 
-            if ($generation->created_at->diffInMinutes(now()) >= self::PATIENCE_MINUTES) {
+        if (in_array($code, self::TRY_LATER, true)) {
+            // "Busy" doesn't prove an earlier, unanswered attempt wasn't created, so after one we keep asking.
+            $patienceUsed = $generation->submit_started_at->diffInMinutes(now()) >= self::PATIENCE_MINUTES;
+            if ($patienceUsed && ! $generation->outcome_unknown) {
                 $record->reject($generation, 'provider_busy');
 
                 return;
@@ -94,6 +111,13 @@ class SubmitGeneration implements ShouldBeUnique, ShouldQueue
         }
 
         $record->reject($generation, $code, $response->json('error.message'));
+    }
+
+    /** Pixelforge may or may not have it: remember that, and re-ask with the same key. */
+    private function unknownOutcome(Generation $generation): void
+    {
+        $generation->forceFill(['outcome_unknown' => true])->save();
+        $this->release($this->nextDelay());
     }
 
     /** 2 s, 4 s, 8 s … capped at a minute, plus jitter so queued users don't knock in lockstep. */

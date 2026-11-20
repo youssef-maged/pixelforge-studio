@@ -87,3 +87,15 @@ it('tells someone who was signed out mid-session why they are on the login page'
     expect(session('inertia.flash_data.toast.message') ?? collect(session()->all())->flatten()->first(fn ($v) => is_string($v) && str_contains($v, 'signed out')))
         ->toContain('signed out');
 });
+
+it('explains a rate limit in words instead of a raw error page', function () {
+    $user = User::factory()->create();
+
+    foreach (range(1, 10) as $ignored) {
+        $this->actingAs($user)->post('/generations', [], ['X-Inertia' => 'true']);
+    }
+
+    $this->actingAs($user)->from('/studio')->post('/generations', [], ['X-Inertia' => 'true'])
+        ->assertRedirect('/studio')
+        ->assertInertiaFlash('toast.type', 'warning');
+});

@@ -47,12 +47,15 @@ class PixelforgeClient
      */
     public function pricing(bool $fresh = false): Pricing
     {
+        // The last good list is kept forever as a fallback; it's refetched when older than 10 minutes.
         $cached = Cache::get('pixelforge.pricing');
+        $stale = Cache::get('pixelforge.pricing.fetched_at', 0) < now()->subMinutes(10)->getTimestamp();
 
-        if ($fresh || $cached === null) {
+        if ($fresh || $stale || $cached === null) {
             try {
                 $cached = Http::baseUrl($this->url)->acceptJson()->timeout(5)->get('pricing')->throw()->json();
                 Cache::forever('pixelforge.pricing', $cached);
+                Cache::forever('pixelforge.pricing.fetched_at', now()->getTimestamp());
             } catch (Throwable $e) {
                 throw_if($cached === null, $e);
                 report($e);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\WebhookEvent;
+use App\Support\Like;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,8 +22,8 @@ class WebhookEventController extends Controller
         ]);
 
         $events = WebhookEvent::query()
-            ->when($filters['q'] ?? null, fn (Builder $query, string $search) => $query->where(fn (Builder $query) => $query
-                ->whereLike('id', "%{$search}%")->orWhereLike('type', "%{$search}%")->orWhereRaw('generation_id::text ilike ?', ["%{$search}%"])))
+            ->when(filled($search = $filters['q'] ?? null), fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                ->whereLike('id', Like::contains($search))->orWhereLike('type', Like::contains($search))->orWhereRaw('generation_id::text ilike ?', [Like::contains($search)])))
             ->when($request->boolean('duplicates'), fn (Builder $query) => $query->where('deliveries', '>', 1))
             ->orderByDesc('received_at')
             ->paginate(50)

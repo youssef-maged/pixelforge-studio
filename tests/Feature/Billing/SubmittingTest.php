@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\RecordGenerationState;
+use App\Actions\StartGeneration;
 use App\Enums\GenerationStatus;
 use App\Jobs\ReconcileGenerations;
 use App\Jobs\SubmitGeneration;
@@ -134,7 +135,7 @@ it('retries a timeout (unknown outcome) instead of failing it', function () {
 });
 
 it('gives up for free after 15 minutes of Pixelforge being busy', function () {
-    $generation = Generation::factory()->create(['created_at' => now()->subMinutes(16)]);
+    $generation = Generation::factory()->create(['submit_started_at' => now()->subMinutes(16)]);
     Http::fake(['*/v1/generations' => Http::response(['error' => ['code' => 'concurrency_limit_exceeded']], 429, ['Retry-After' => '5'])]);
 
     runSubmit($generation)->assertNotReleased();
@@ -144,6 +145,48 @@ it('gives up for free after 15 minutes of Pixelforge being busy', function () {
         ->error_code->toBe('provider_busy')
         ->hold_nano->toBe(0)
         ->charge_nano->toBeNull();
+});
+
+it('counts the 15 minutes from the first real attempt, not from the click', function () {
+    // e.g. the queue message was lost and the sweep only re-sent it 20 minutes later
+    $generation = Generation::factory()->create(['created_at' => now()->subMinutes(20)]);
+    Http::fake(['*/v1/generations' => Http::response(['error' => ['code' => 'rate_limit_exceeded']], 429, ['Retry-After' => '5'])]);
+
+    runSubmit($generation)->assertReleased();
+
+    expect($generation->fresh())->status->toBe(GenerationStatus::Pending)->submit_started_at->not->toBeNull();
+});
+
+it('never gives up on "busy" once an earlier attempt had an unknown outcome', function () {
+    // Pixelforge may have created it during the timeout, and "busy" doesn't prove otherwise.
+    $generation = Generation::factory()->create(['submit_started_at' => now()->subMinutes(16), 'outcome_unknown' => true]);
+    Http::fake(['*/v1/generations' => Http::response(['error' => ['code' => 'rate_limit_exceeded']], 429, ['Retry-After' => '5'])]);
+
+    runSubmit($generation)->assertReleased();
+
+    expect($generation->fresh()->status)->toBe(GenerationStatus::Pending);
+});
+
+it('remembers an unknown outcome', function () {
+    $generation = Generation::factory()->create();
+    Http::fake(['*/v1/generations' => Http::response('Bad gateway', 502)]);
+
+    runSubmit($generation)->assertReleased();
+
+    expect($generation->fresh()->outcome_unknown)->toBeTrue();
+});
+
+it('backs off after an unexpected crash instead of looping', function () {
+    expect((new SubmitGeneration(Generation::factory()->create()))->backoff())->toBe([5, 15, 30, 60]);
+});
+
+it('caps generations in flight across the whole app', function () {
+    Queue::fake();
+    Generation::factory()->count(StartGeneration::MAX_IN_FLIGHT_TOTAL)->create(['status' => GenerationStatus::Processing]);
+    $user = User::factory()->create(['balance_nano' => 10_000_000_000]);
+
+    $this->actingAs($user)->post('/generations', submitForm())->assertSessionHasErrors(['prompt' => 'PixelForge is busy right now. Try again in a minute.']);
+    Queue::assertNothingPushed();
 });
 
 it('fails for free when Pixelforge refuses outright', function (int $status, string $code) {

@@ -19,6 +19,9 @@ class StartGeneration
 {
     public const MAX_IN_FLIGHT_PER_USER = 3;
 
+    /** Across everyone: Pixelforge's limits are per account, shared by all our users. */
+    public const MAX_IN_FLIGHT_TOTAL = 10;
+
     public function __construct(private PixelforgeClient $pixelforge) {}
 
     /** @param array<array-key, string> $referenceImages */
@@ -34,6 +37,15 @@ class StartGeneration
             $existing = $user->generations()->where('client_request_id', $clientRequestId)->first();
             if ($existing) {
                 return $existing; // the same form submitted twice
+            }
+
+            // One transaction-scoped lock for the app-wide count (taken after the user row, like every money path),
+            // so two users can't both squeeze into the last slot.
+            DB::select('select pg_advisory_xact_lock(?)', [crc32('pixelforge.in-flight')]);
+            if (Generation::query()->whereIn('status', GenerationStatus::inFlight())->count() >= self::MAX_IN_FLIGHT_TOTAL) {
+                throw ValidationException::withMessages([
+                    'prompt' => 'PixelForge is busy right now. Try again in a minute.',
+                ]);
             }
 
             if ($user->inFlightGenerations()->count() >= self::MAX_IN_FLIGHT_PER_USER) {

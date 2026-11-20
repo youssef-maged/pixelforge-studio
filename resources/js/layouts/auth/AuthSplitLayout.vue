@@ -3,6 +3,7 @@ import { Link } from '@inertiajs/vue3';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import OfflineBanner from '@/components/OfflineBanner.vue';
 import PrintWall from '@/components/marketing/PrintWall.vue';
+import { Toaster } from '@/components/ui/sonner';
 import { home } from '@/routes';
 
 defineProps<{ title?: string; description?: string }>();
@@ -72,6 +73,7 @@ const PROMISES = [
                 </li>
             </ul>
         </aside>
+        <Toaster />
         <OfflineBanner />
     </div>
 </template>

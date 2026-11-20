@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\GenerationStatus;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\Like;
 use App\Support\Nano;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -19,7 +20,7 @@ class UserController extends Controller
         $search = $request->validate(['q' => ['nullable', 'string', 'max:100']])['q'] ?? null;
 
         $users = User::query()
-            ->when($search, fn (Builder $query, string $search) => $query->whereLike('name', "%{$search}%")->orWhereLike('email', "%{$search}%"))
+            ->when(filled($search), fn (Builder $query) => $query->whereLike('name', Like::contains($search))->orWhereLike('email', Like::contains($search)))
             ->withSum(['generations as held_nano' => fn (Builder $query) => $query->whereIn('status', GenerationStatus::inFlight())], 'hold_nano')
             ->withSum(['creditTransactions as purchased_nano' => fn (Builder $query) => $query->where('type', 'purchase')], 'amount_nano')
             ->withSum(['creditTransactions as spent_nano' => fn (Builder $query) => $query->where('type', 'charge')], 'amount_nano')

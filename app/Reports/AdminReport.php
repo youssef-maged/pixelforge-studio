@@ -4,6 +4,7 @@ namespace App\Reports;
 
 use App\Enums\GenerationStatus;
 use App\Models\Generation;
+use App\Support\Like;
 use App\Support\Nano;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonPeriod;
@@ -104,8 +105,8 @@ final class AdminReport
             ->join('users', 'users.id', '=', 'generations.user_id')
             ->whereIn('generations.status', [GenerationStatus::Succeeded, GenerationStatus::Failed])
             ->whereBetween('generations.completed_at', [$this->from->startOfDay(), $this->to->endOfDay()])
-            ->when($this->search, fn (Builder $query, string $search) => $query->where(
-                fn (Builder $query) => $query->whereLike('users.name', "%{$search}%")->orWhereLike('users.email', "%{$search}%"),
+            ->when(filled($this->search), fn (Builder $query) => $query->where(
+                fn (Builder $query) => $query->whereLike('users.name', Like::contains($this->search))->orWhereLike('users.email', Like::contains($this->search)),
             ));
     }
 }
