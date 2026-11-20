@@ -13,6 +13,20 @@ jobs:
   ci:
     runs-on: ubuntu-latest
 
+    # Same Postgres and port as local (compose.yaml) and phpunit.xml. Tests use an array cache and a sync
+    # queue, so no Redis is needed here.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: pixelforge
+          POSTGRES_PASSWORD: pixelforge
+          POSTGRES_DB: pixelforge
+        ports: ['54360:5432']
+        options: >-
+          --health-cmd "pg_isready -U pixelforge"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -22,14 +36,18 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
-          php-version: '8.3'
+          php-version: '8.4'
           tools: composer:v2
           coverage: none
+          ini-values: memory_limit=1G # Larastan needs more than the default 128M
 
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '22'
+          node-version: '24'
+
+      - name: Create the test database
+        run: PGPASSWORD=pixelforge psql -h 127.0.0.1 -p 54360 -U pixelforge -c 'CREATE DATABASE pixelforge_test'
 
       - name: Setup Application
         run: composer setup
